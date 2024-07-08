@@ -7,12 +7,12 @@ from datetime import datetime
 
 class GPSVisualizer:
 
-    def __init__(self, file_path, zoom, playback_speed):
+    def __init__(self, file_path, zoom, playback_speed, *, frame_size=600):
         dp = DataParser(file_path)
         self.position, self.heading = dp.parse_data()
         self.playback_speed = playback_speed
         self.zoom = zoom
-        self.first_time = next(iter(self.position))
+        self.frame_size = frame_size
         self.get_map()
         
     def get_map(self, save=False):
@@ -23,7 +23,7 @@ class GPSVisualizer:
             map.save_png("map.png")
         self.map_obj = map
         frame = cv2.cvtColor(map.to_numpy(), cv2.COLOR_RGB2BGR)
-        frame = cv2.resize(frame, (600, 600), interpolation=cv2.INTER_LINEAR)
+        frame = cv2.resize(frame, (self.frame_size, self.frame_size), interpolation=cv2.INTER_LINEAR)
         # sharpen the frame
         frame = cv2.GaussianBlur(frame, (0, 0), 1.0)
         frame = cv2.addWeighted(frame, 1.5, frame, -0.5, 0)
@@ -43,8 +43,8 @@ class GPSVisualizer:
     def rescale(self, x, y):
         size_w = self.map_obj.w
         size_h = self.map_obj.h
-        x = int(x * 600 / size_w)
-        y = int(y * 600 / size_h)
+        x = int(x * self.frame_size / size_w)
+        y = int(y * self.frame_size / size_h)
         return x, y
 
     def draw_test(self):
@@ -84,5 +84,5 @@ if __name__ == "__main__":
     # file_path = "logs_6_06_24/GPSlog_1717697944.txt"
     file_path = "logs_6_06_24/GPSlog_1717701866.txt"
     playback_speed = 1000
-    visualizer = GPSVisualizer(file_path, 19, playback_speed)
+    visualizer = GPSVisualizer(file_path, 19, playback_speed, frame_size=900)
     visualizer.draw()
