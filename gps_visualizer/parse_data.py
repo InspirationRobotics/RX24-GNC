@@ -3,7 +3,9 @@ import time
 
 class DataParser:
 
-    def __init__(self, file_path):
+    def __init__(self, file_path : Path | str):
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
         self.file_path = file_path
         self.position = {}
         self.heading = {}
