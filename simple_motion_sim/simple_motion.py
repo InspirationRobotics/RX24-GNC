@@ -21,7 +21,8 @@ class Thruster:
         self.set_thrust(normalized_thrust * self.max_thrust)
 
     def get_dynamics(self):
-        force = self.thrust * np.array([np.sin(self.rad_angle), np.cos(self.rad_angle)])
+        force = self.thrust * 4.44822 # convert to newtons from lbf
+        force *= np.array([np.sin(self.rad_angle), np.cos(self.rad_angle)])
         torque = np.cross(self.position, force)
         return force, torque
     
@@ -55,27 +56,13 @@ class Boat:
 
         self.max_thrust = max([t.max_thrust for t in self.thrusters])
 
-    def full_throttle(self):
+    def full_thrust(self):
         for thruster in self.thrusters:
-            thruster.set_thrust(1.0)
+            thruster.set_normalized_thrust(1.0)
 
-    def strafe_right(self):
-        self.thrusters[0].set_thrust(-1.0) #fr
-        self.thrusters[1].set_thrust(1.0) #fl
-        self.thrusters[2].set_thrust(1.0) #br
-        self.thrusters[3].set_thrust(-1.0) #bl
-
-    def rotate_cc(self):
-        self.thrusters[0].set_thrust(1.0) #fr
-        # self.thrusters[1].set_normalized_thrust(-1.0) #fl
-        # self.thrusters[2].set_normalized_thrust(1.0) #br
-        self.thrusters[3].set_thrust(-1.0) #bl
-
-    def arc_right(self):
-        self.thrusters[0].set_thrust(1.0)
-        # self.thrusters[1].set_thrust(1.0)
-        # self.thrusters[2].set_thrust(1.0)
-        # self.thrusters[3].set_thrust(0.0)
+    def full_four_thrust(self):
+        for i in range(4):
+            self.thrusters[i].set_normalized_thrust(1.0)
 
     def update(self):
         net_force = np.array([0.0, 0.0])
@@ -84,26 +71,27 @@ class Boat:
         for thruster in self.thrusters:
             force, torque = thruster.get_dynamics()
             net_force += force
-            net_torque += torque 
+            # assumes a constant moment of inertia
+            net_torque += torque
         
-        self.position += net_force * self.dt
-        self.orientation += net_torque * self.dt
+        self.position += (net_force / self.max_thrust) * self.dt
+        self.orientation += (net_torque / self.max_thrust) * self.dt
         print(f'Position: {self.position}, Orientation: {self.orientation}')
-        print(f'Net Force: {net_force}, Net Torque: {net_torque}')
+        print(f'Net Force: {net_force} Newtons, Net Torque: {net_torque} Newton-meters')
 
 
 class simple_motion_sim:
     def __init__(self, config_file):
         self.boat = Boat(config_file)
         self.setup_plot()
-        self.boat.rotate_cc()
+        self.boat.full_four_thrust()
         self.run_simulation()
 
     def setup_plot(self):
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlim(-20, 20)
-        self.ax.set_ylim(-20, 20)
-        self.boat_patch = Rectangle(self.boat.position - 0.5, 1, 1, angle=0.0, fc='blue', rotation_point='center')
+        self.ax.set_xlim(-30, 30)
+        self.ax.set_ylim(-30, 30)
+        self.boat_patch = Rectangle(self.boat.position - 0.5, 1, 2, angle=0.0, fc='blue', rotation_point='center')
         self.ax.add_patch(self.boat_patch)
 
     def update(self, frame):
@@ -118,4 +106,4 @@ class simple_motion_sim:
 
 
 if __name__ == "__main__":
-    sim = simple_motion_sim("configs/simple_config.json")
+    sim = simple_motion_sim("configs/wamv_config.json")
