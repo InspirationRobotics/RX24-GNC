@@ -1,0 +1,35 @@
+{
+    "name"  : "simple",
+    "vehicle": {
+        "initial_position" : [0.0, 0.0],
+        "initial_orientation" : 0.0,
+        "time_step" : 0.1,
+        "thruster_count" : 4,
+        "thruster_config" : {
+            "0" : {
+                "name" : "front right",
+                "position" : [0.5, 0.5],
+                "angle" : -45,
+                "thrust" : 35
+            },
+            "1" : {
+                "name" : "front left",
+                "position" : [-0.5, 0.5],
+                "angle" : 45,
+                "thrust" : 35
+            },
+            "2" : {
+                "name" : "back right",
+                "position" : [0.5, -0.5],
+                "angle" : 45,
+                "thrust" : 35
+            },
+            "3" : {
+                "name" : "back left",
+                "position" : [-0.5, -0.5],
+                "angle" : -45,
+                "thrust" : 35
+            }
+        }
+    }
+}

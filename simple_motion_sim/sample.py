@@ -19,7 +19,7 @@ thruster_positions = [ # the rectangle is horizontal
 ]
 
 # Thrust levels and angles (initially zero)
-thrust_levels = [0.0, 0.0, 0.0, 0.0]
+thrust_levels = [0.2, 0.0, 0.0, 0.0]
 thrust_angles = [0.0, 0.0, 0.0, 0.0]
 
 # Update function
@@ -50,8 +50,8 @@ def update(frame):
 
 # Set up the plot
 fig, ax = plt.subplots()
-ax.set_xlim(-10, 10)
-ax.set_ylim(-10, 10)
+ax.set_xlim(-20, 20)
+ax.set_ylim(-20, 20)
 
 boat = Rectangle(boat_position - 0.5, 1, 1, angle=0.0, fc='blue')
 ax.add_patch(boat)
