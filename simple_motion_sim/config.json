@@ -1,0 +1,47 @@
+{
+    "name"  : "Wam-V 16",
+    "vehicle": {
+        "initial_position" : [0.0, 0.0],
+        "initial_orientation" : 0.0,
+        "time_step" : 0.1,
+        "thruster_count" : 6,
+        "thruster_config" : {
+            "0" : {
+                "name" : "T500 right 1",
+                "position" : [2, 2],
+                "angle" : -45,
+                "thrust" : 35
+            },
+            "1" : {
+                "name" : "T500 right 2",
+                "position" : [2.2, 2],
+                "angle" : -45,
+                "thrust" : 35
+            },
+            "2" : {
+                "name" : "T500 left 1",
+                "position" : [-2, 2],
+                "angle" : 45,
+                "thrust" : 35
+            },
+            "3" : {
+                "name" : "T500 left 2",
+                "position" : [-2.2, 2],
+                "angle" : 45,
+                "thrust" : 35
+            },
+            "4" : {
+                "name" : "Torqeedo right",
+                "position" : [2, -2],
+                "angle" : 15,
+                "thrust" : 120
+            },
+            "5" : {
+                "name" : "Torqeedo left",
+                "position" : [-2, -2],
+                "angle" : -15,
+                "thrust" : 120
+            }
+        }
+    }
+}
