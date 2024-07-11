@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, FancyArrowPatch
 from matplotlib.animation import FuncAnimation
 
+from threading import Thread
+
 class Thruster:
     def __init__(self, name, position, angle, max_thrust):
         self.name = name
@@ -121,35 +123,45 @@ class Boat:
         xy_cancel = np.array([force1[0] / force_unit[0], force1[1] / force_unit[1]])
         return (xy_cancel / 4.44822) / thruster2.max_thrust
     
+    def set_thrust(self, thruster_id : int, *, normalized_thrust : float = None, raw_thrust : float = None):
+        if normalized_thrust is not None and raw_thrust is not None:
+            raise ValueError("Only one of normalized_thrust or raw_thrust can be set")
+        if normalized_thrust is not None:
+            self.thrusters[thruster_id].set_normalized_thrust(normalized_thrust)
+        elif raw_thrust is not None:
+            self.thrusters[thruster_id].set_thrust(raw_thrust)
+        else:
+            raise ValueError("Either normalized_thrust or raw_thrust must be set")
+    
     def strafe_left(self):
-        self.thrusters[0].set_normalized_thrust(1.0) # front right
-        self.thrusters[1].set_normalized_thrust(-1.0) # front left
-        self.thrusters[2].set_normalized_thrust(-1.0) # back right
-        self.thrusters[3].set_normalized_thrust(1.0) # back left
+        self.set_thrust(0, normalized_thrust=1.0) # front right
+        self.set_thrust(1, normalized_thrust=-1.0) # front left
+        self.set_thrust(2, normalized_thrust=-1.0) # back right
+        self.set_thrust(3, normalized_thrust=1.0) # back left
 
     def strafe_wamv_left(self):
-        self.thrusters[0].set_normalized_thrust(0.2) # front right
-        self.thrusters[1].set_normalized_thrust(-0.2) # front left
-        self.thrusters[2].set_normalized_thrust(-0.138) # back right
-        self.thrusters[3].set_normalized_thrust(0.138) # back left
+        self.set_thrust(0, normalized_thrust=0.2) # front right
+        self.set_thrust(1, normalized_thrust=-0.2) # front left
+        self.set_thrust(2, normalized_thrust=-0.138) # back right
+        self.set_thrust(3, normalized_thrust=0.138) # back left
 
     def strafe_wamv_right(self):
-        self.thrusters[0].set_normalized_thrust(-0.2) # front right
-        self.thrusters[1].set_normalized_thrust(0.2) # front left
-        self.thrusters[2].set_normalized_thrust(0.138) # back right
-        self.thrusters[3].set_normalized_thrust(-0.138) # back left
+        self.set_thrust(0, normalized_thrust=-0.2) # front right
+        self.set_thrust(1, normalized_thrust=0.2) # front left
+        self.set_thrust(2, normalized_thrust=0.138) # back right
+        self.set_thrust(3, normalized_thrust=-0.138) # back left
 
     def rotate_wamv_ccw(self):
-        self.thrusters[0].set_normalized_thrust(0.2)
-        self.thrusters[1].set_normalized_thrust(-0.2)
-        self.thrusters[2].set_normalized_thrust(0.138)
-        self.thrusters[3].set_normalized_thrust(-0.138)
+        self.set_thrust(0, normalized_thrust=0.2)
+        self.set_thrust(1, normalized_thrust=-0.2)
+        self.set_thrust(2, normalized_thrust=0.138)
+        self.set_thrust(3, normalized_thrust=-0.138)
 
     def rotate_ccw(self):
-        self.thrusters[0].set_normalized_thrust(0.2)
-        self.thrusters[1].set_normalized_thrust(-0.2)
-        self.thrusters[2].set_normalized_thrust(0.2)
-        self.thrusters[3].set_normalized_thrust(-0.2)
+        self.set_thrust(0, normalized_thrust=0.2)
+        self.set_thrust(1, normalized_thrust=-0.2)
+        self.set_thrust(2, normalized_thrust=0.2)
+        self.set_thrust(3, normalized_thrust=-0.2)
 
     def full_thrust(self):
         for thruster in self.thrusters:
@@ -157,7 +169,7 @@ class Boat:
 
     def full_four_thrust(self):
         for i in range(4):
-            self.thrusters[i].set_normalized_thrust(1.0)
+            self.set_thrust(i, normalized_thrust=1.0)
 
     def update(self):
         net_force = np.array([0.0, 0.0])
@@ -182,9 +194,12 @@ class Boat:
 
 
 class simple_motion_sim:
-    def __init__(self, config_file):
+    def __init__(self, config_file, background_func=None):
         self.boat = Boat(config_file)
-        self.boat.rotate_wamv_ccw()
+        self.background_func = background_func
+
+    def set_thrust(self, thruster_id : int, *, normalized_thrust : float = None, raw_thrust : float = None):
+        self.boat.set_thrust(thruster_id, normalized_thrust=normalized_thrust, raw_thrust=raw_thrust)
 
     def calc_arrow(self, arrow : FancyArrowPatch, position : List[float], orientation : float):
         orientation = orientation + np.pi / 2
@@ -201,6 +216,10 @@ class simple_motion_sim:
         self.calc_arrow(self.arrow, self.boat.position, self.boat.orientation)
         self.ax.add_patch(self.boat_patch)
         self.ax.add_patch(self.arrow)
+
+        if self.background_func is not None:
+            self.back_thread = Thread(target=self.background_func)
+            self.back_thread.start()
 
     def update(self, frame):
         self.boat.update()
@@ -221,5 +240,5 @@ class simple_motion_sim:
 if __name__ == "__main__":
     sim = simple_motion_sim("configs/wamv_config.json")
     sim.run_simulation()
-    res = Boat.calc_thrust_cancellation(sim.boat.thrusters[0], sim.boat.thrusters[2], 0.2)
-    print(res)
+    # res = Boat.calc_thrust_cancellation(sim.boat.thrusters[0], sim.boat.thrusters[2], 0.2)
+    # print(res)
