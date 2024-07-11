@@ -1,9 +1,8 @@
-import cv2
 import json
 import numpy as np
 from typing import List
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, FancyArrowPatch
 from matplotlib.animation import FuncAnimation
 
 class Thruster:
@@ -20,9 +19,12 @@ class Thruster:
     def set_normalized_thrust(self, normalized_thrust):
         self.set_thrust(normalized_thrust * self.max_thrust)
 
-    def get_dynamics(self, thrust : float = None):
-        if thrust is not None:
+    def get_dynamics(self, *, normalized_thrust : float = None, raw_thrust : float = None):
+        if normalized_thrust is not None:
+            thrust = normalized_thrust * self.max_thrust
             thrust = np.clip(thrust, -self.max_thrust, self.max_thrust)
+        elif raw_thrust is not None:
+            thrust = raw_thrust
         else:
             thrust = self.thrust
         force = thrust * 4.44822 # convert to newtons from lbf
@@ -49,13 +51,16 @@ class LinkedThrusters:
     def set_normalized_thrust(self, normalized_thrust):
         self.set_thrust(normalized_thrust * self.max_thrust)
 
-    def get_dynamics(self, thrust : float = None):
-        if thrust is not None:
+    def get_dynamics(self, *, normalized_thrust : float = None, raw_thrust : float = None):
+        if normalized_thrust is not None:
+            thrust = normalized_thrust * self.max_thrust
             thrust = np.clip(thrust, -self.max_thrust, self.max_thrust)
+        elif raw_thrust is not None:
+            thrust = raw_thrust
         else:
             thrust = self.thrust
-        force1, torque1 = self.thruster1.get_dynamics(thrust * self.thrust1_ratio)
-        force2, torque2 = self.thruster2.get_dynamics(thrust * self.thrust2_ratio)
+        force1, torque1 = self.thruster1.get_dynamics(raw_thrust = thrust * self.thrust1_ratio)
+        force2, torque2 = self.thruster2.get_dynamics(raw_thrust = thrust * self.thrust2_ratio)
         return force1 + force2, torque1 + torque2
     
 class Boat:
@@ -102,23 +107,29 @@ class Boat:
                 thrusters.pop(i)
         
         self.thrusters = thrusters
-        print([thruster.name for thruster in self.thrusters])
+        self.names = [thruster.name for thruster in self.thrusters]
 
         self.max_thrust = max([t.max_thrust for t in self.thrusters])
 
     @staticmethod
     def calc_thrust_cancellation(thruster1 : Thruster, thruster2 : Thruster, power1 : float):
-        force1, torque1 = thruster1.get_dynamics(power1)
-        # Calculate the force unit vector for thruster21
+        force1, _ = thruster1.get_dynamics(normalized_thrust=power1)
+        # Calculate the force unit vector for thruster2
         force_unit = np.array([np.sin(thruster2.rad_angle), np.cos(thruster2.rad_angle)])
         xy_cancel = np.array([force1[0] / force_unit[0], force1[1] / force_unit[1]])
-        return xy_cancel / 4.44822
+        return (xy_cancel / 4.44822) / thruster2.max_thrust
     
-    def strafe_right(self):
-        self.thrusters[0].set_normalized_thrust(1.0)
-        self.thrusters[1].set_normalized_thrust(-1.0)
-        self.thrusters[2].set_normalized_thrust(-1.0)
-        self.thrusters[3].set_normalized_thrust(1.0)
+    def strafe_left(self):
+        self.thrusters[0].set_normalized_thrust(1.0) # front right
+        self.thrusters[1].set_normalized_thrust(-1.0) # front left
+        self.thrusters[2].set_normalized_thrust(-1.0) # back right
+        self.thrusters[3].set_normalized_thrust(1.0) # back left
+
+    def rotate_ccw(self):
+        self.thrusters[0].set_normalized_thrust(0.2)
+        self.thrusters[1].set_normalized_thrust(-0.2)
+        self.thrusters[2].set_normalized_thrust(0.2)
+        self.thrusters[3].set_normalized_thrust(-0.2)
 
     def full_thrust(self):
         for thruster in self.thrusters:
@@ -138,8 +149,14 @@ class Boat:
             # assumes a constant moment of inertia
             net_torque += torque
         
+        # Lets assume a drag coefficient of 0.2 for translational
+        net_force *= 0.8
+        # Lets assume a drag coefficient of 0.4 for rotational
+        net_torque *= 0.6
         self.position += (net_force / self.max_thrust) * self.dt
         self.orientation += (net_torque / self.max_thrust) * self.dt
+        print("==================================")
+        print(self.names)
         print(f'Position: {self.position}, Orientation: {self.orientation}')
         print(f'Net Force: {net_force} Newtons, Net Torque: {net_torque} Newton-meters')
 
@@ -147,20 +164,33 @@ class Boat:
 class simple_motion_sim:
     def __init__(self, config_file):
         self.boat = Boat(config_file)
-        self.boat.strafe_right()
+        self.boat.rotate_ccw()
+
+    def calc_arrow(self, arrow : FancyArrowPatch, position : List[float], orientation : float):
+        orientation = orientation + np.pi / 2
+        tail = [position[0], position[1]]
+        head = [position[0] + np.cos(orientation)*5, position[1] + np.sin(orientation)*5]
+        arrow.set_positions(tail, head)
 
     def setup_plot(self):
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlim(-30, 30)
         self.ax.set_ylim(-30, 30)
         self.boat_patch = Rectangle(self.boat.position - 0.5, 1, 2, angle=0.0, fc='blue', rotation_point='center')
+        self.arrow = FancyArrowPatch(self.boat.position, self.boat.position, arrowstyle='->', mutation_scale=10, color='red')
+        self.calc_arrow(self.arrow, self.boat.position, self.boat.orientation)
         self.ax.add_patch(self.boat_patch)
+        self.ax.add_patch(self.arrow)
 
     def update(self, frame):
         self.boat.update()
         self.boat_patch.set_xy(self.boat.position - 0.5)
         self.boat_patch.angle = np.degrees(self.boat.orientation)
-        return self.boat_patch,
+        # Draw an arrow for the orientation across the rectangle
+        self.calc_arrow(self.arrow, self.boat.position, self.boat.orientation)
+        # self.arrow.set_positions(self.boat.position, self.boat.position + 0.5 * np.array([np.cos(self.boat.orientation + np.pi / 2), np.sin(self.boat.orientation + np.pi / 2)]))
+
+        return self.boat_patch, self.arrow,
 
     def run_simulation(self):
         self.setup_plot()
@@ -171,6 +201,3 @@ class simple_motion_sim:
 if __name__ == "__main__":
     sim = simple_motion_sim("configs/wamv_config.json")
     sim.run_simulation()
-    res = Boat.calc_thrust_cancellation(sim.boat.thrusters[0], sim.boat.thrusters[3], 30.0)
-    print(res)
-    print(res[1] / res[0])
