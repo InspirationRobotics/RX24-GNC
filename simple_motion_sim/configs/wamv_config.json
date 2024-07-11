@@ -5,6 +5,16 @@
         "initial_orientation" : 0.0,
         "time_step" : 0.1,
         "thruster_count" : 6,
+        "links" : {
+            "0" : {
+                "name" : "T500 right",
+                "indexes" : [0, 1]
+                },
+            "1" : {
+                "name" : "T500 left",
+                "indexes" : [2, 3]
+                }
+            },
         "thruster_config" : {
             "0" : {
                 "name" : "T500 right 1",
