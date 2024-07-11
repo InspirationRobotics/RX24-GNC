@@ -108,6 +108,7 @@ class Boat:
         
         self.thrusters = thrusters
         self.names = [thruster.name for thruster in self.thrusters]
+        print(self.names)
 
         self.max_thrust = max([t.max_thrust for t in self.thrusters])
 
@@ -116,6 +117,7 @@ class Boat:
         force1, _ = thruster1.get_dynamics(normalized_thrust=power1)
         # Calculate the force unit vector for thruster2
         force_unit = np.array([np.sin(thruster2.rad_angle), np.cos(thruster2.rad_angle)])
+        print(force1, force_unit)
         xy_cancel = np.array([force1[0] / force_unit[0], force1[1] / force_unit[1]])
         return (xy_cancel / 4.44822) / thruster2.max_thrust
     
@@ -124,6 +126,24 @@ class Boat:
         self.thrusters[1].set_normalized_thrust(-1.0) # front left
         self.thrusters[2].set_normalized_thrust(-1.0) # back right
         self.thrusters[3].set_normalized_thrust(1.0) # back left
+
+    def strafe_wamv_left(self):
+        self.thrusters[0].set_normalized_thrust(0.2) # front right
+        self.thrusters[1].set_normalized_thrust(-0.2) # front left
+        self.thrusters[2].set_normalized_thrust(-0.138) # back right
+        self.thrusters[3].set_normalized_thrust(0.138) # back left
+
+    def strafe_wamv_right(self):
+        self.thrusters[0].set_normalized_thrust(-0.2) # front right
+        self.thrusters[1].set_normalized_thrust(0.2) # front left
+        self.thrusters[2].set_normalized_thrust(0.138) # back right
+        self.thrusters[3].set_normalized_thrust(-0.138) # back left
+
+    def rotate_wamv_ccw(self):
+        self.thrusters[0].set_normalized_thrust(0.2)
+        self.thrusters[1].set_normalized_thrust(-0.2)
+        self.thrusters[2].set_normalized_thrust(0.138)
+        self.thrusters[3].set_normalized_thrust(-0.138)
 
     def rotate_ccw(self):
         self.thrusters[0].set_normalized_thrust(0.2)
@@ -151,8 +171,8 @@ class Boat:
         
         # Lets assume a drag coefficient of 0.2 for translational
         net_force *= 0.8
-        # Lets assume a drag coefficient of 0.4 for rotational
-        net_torque *= 0.6
+        # Lets assume a drag coefficient of 0.8 for rotational
+        net_torque *= 0.2
         self.position += (net_force / self.max_thrust) * self.dt
         self.orientation += (net_torque / self.max_thrust) * self.dt
         print("==================================")
@@ -164,7 +184,7 @@ class Boat:
 class simple_motion_sim:
     def __init__(self, config_file):
         self.boat = Boat(config_file)
-        self.boat.rotate_ccw()
+        self.boat.rotate_wamv_ccw()
 
     def calc_arrow(self, arrow : FancyArrowPatch, position : List[float], orientation : float):
         orientation = orientation + np.pi / 2
@@ -201,3 +221,5 @@ class simple_motion_sim:
 if __name__ == "__main__":
     sim = simple_motion_sim("configs/wamv_config.json")
     sim.run_simulation()
+    res = Boat.calc_thrust_cancellation(sim.boat.thrusters[0], sim.boat.thrusters[2], 0.2)
+    print(res)
