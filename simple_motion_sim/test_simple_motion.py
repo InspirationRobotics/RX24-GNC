@@ -20,17 +20,11 @@ def strafe_left():
     sim.set_thrust(2, normalized_thrust=-1.0) # back right
     sim.set_thrust(3, normalized_thrust=1.0) # back left
 
-def strafe_wamv_left():
-    sim.set_thrust(0, normalized_thrust=0.2) # front right
-    sim.set_thrust(1, normalized_thrust=-0.2) # front left
-    sim.set_thrust(2, normalized_thrust=-0.138) # back right
-    sim.set_thrust(3, normalized_thrust=0.138) # back left
-
-def strafe_wamv_right():
-    sim.set_thrust(0, normalized_thrust=-0.2) # front right
-    sim.set_thrust(1, normalized_thrust=0.2) # front left
-    sim.set_thrust(2, normalized_thrust=0.138) # back right
-    sim.set_thrust(3, normalized_thrust=-0.138) # back left
+def strafe_right():
+    sim.set_thrust(0, normalized_thrust=-1) # front right
+    sim.set_thrust(1, normalized_thrust=1) # front left
+    sim.set_thrust(2, normalized_thrust=1) # back right
+    sim.set_thrust(3, normalized_thrust=-1) # back left
 
 def rotate_wamv_ccw():
     sim.set_thrust(0, normalized_thrust=0.2)
@@ -64,12 +58,12 @@ def stop_move():
 
 def test_func():
     while sim.active:
-        strafe_wamv_left()
+        strafe_left()
         time.sleep(2)
-        strafe_wamv_right()
+        strafe_right()
         time.sleep(2)
     stop_move()
 
 if __name__ == "__main__":
-    sim = Simple_Motion_Sim("configs/wamv_config.json", test_func, verbose=True)
+    sim = Simple_Motion_Sim("configs/simple_config.json", test_func, verbose=True)
     sim.run_simulation()
