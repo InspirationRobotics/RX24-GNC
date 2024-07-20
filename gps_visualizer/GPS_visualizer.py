@@ -7,12 +7,13 @@ from datetime import datetime
 
 class GPSVisualizer:
 
-    def __init__(self, file_path : Path | str, *, zoom : int = 19, playback_speed : int = 10, frame_size : int = 600):
+    def __init__(self, file_path : Path | str, *, zoom : int = 19, playback_speed : int = 10, frame_size : int = 600, heading_offset : float = 0):
         dp = DataParser(file_path)
         self.position, self.heading = dp.parse_data()
         self.playback_speed = playback_speed
         self.zoom = zoom
         self.frame_size = frame_size
+        self.heading_offset = heading_offset
         self.get_map()
         
     def get_map(self, save : bool = False):
@@ -69,7 +70,7 @@ class GPSVisualizer:
             # draw the green heading arrow
             heading = self.heading.get(ts, None)
             if heading is not None:
-                dx, dy = self.convert_heading_to_arrow(heading)
+                dx, dy = self.convert_heading_to_arrow(heading + self.heading_offset)
                 x1, y1 = x + dx, y + dy
                 frame = cv2.arrowedLine(frame, (x, y), (x1, y1), (0, 0, 0), 2, tipLength=0.5)
             # print the time on the frame
