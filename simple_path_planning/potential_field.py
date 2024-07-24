@@ -11,9 +11,9 @@ class Goal:
         self.gain = gain
 
 class Obstacle:
-    def __init__(self, position : np.array, object_radius : float, gain : float = 200000):
+    def __init__(self, position : np.array, object_radius : float, gain : float = 10000):
         self.position = position
-        self.radius = object_radius*2.5
+        self.radius = object_radius*2
         self.gain = gain
         self.draw_radius = int(object_radius)
 
@@ -23,11 +23,16 @@ def attractive_force(current_position : np.array, goal : Goal) -> np.array:
     direction = np.arctan2(force[1], force[0])
     return force, (magnitude, direction)
 
+def sigmoid(x, k=10):
+    return 1 / (1 + np.exp(-k * (x - 0.5)))
+
 def repulsive_force(current_position : np.array, obstacle : Obstacle) -> np.array:
     force = np.zeros(2)
     distance = np.linalg.norm(current_position - obstacle.position)
     if distance < obstacle.radius:
-        force = obstacle.gain * ((1.0 / distance) - (1.0 / obstacle.radius)) * (1.0 / (distance ** 2)) * (current_position - obstacle.position)
+        influence = sigmoid(1-(distance / obstacle.radius)) ** 2
+        force = obstacle.gain * influence * (1.0 / (distance)) * (current_position - obstacle.position)
+        print(influence)
     magnitude = np.linalg.norm(force)
     direction = np.arctan2(force[1], force[0])
     return force, (magnitude, direction)
@@ -49,7 +54,7 @@ def potential_field(current_position : np.array, goals : List[Goal], obstacles :
     magnitude = np.linalg.norm(force)
     direction = np.arctan2(force[1], force[0])
     if magnitude > 1.0:
-        force = force / magnitude
+        force = 2 * (force / magnitude)
     return force, (magnitude, direction)
 
 # Define the obstacle map
@@ -57,21 +62,24 @@ map_size = (720, 1280)
 MAP = np.zeros((map_size[0], map_size[1], 3), np.uint8)
 
 # Define the start and end goal positions
-start = np.array([0, 0], dtype=np.float32)
-end_goal = Goal(np.array([450, 450], dtype=np.float32), 0.1)
+# start = np.array([0, 0], dtype=np.float32)
+# end_goal = Goal(np.array([450, 450], dtype=np.float32), 0.1)
+start = np.array([0, 360], dtype=np.float32)
+end_goal = Goal(np.array([1000, 360], dtype=np.float32), 0.02)
 
 # Define the goals
 goals: List[Goal] = [
-    Goal(np.array([200, 75], dtype=np.float32), 0.1),
-    Goal(np.array([150, 125], dtype=np.float32), 0.1),
+    # Goal(np.array([200, 75], dtype=np.float32), 0.1),
+    # Goal(np.array([150, 125], dtype=np.float32), 0.1),
     end_goal
 ]
 
 # Define the obstacles
 obstacles: List[Obstacle] = [
-    Obstacle(np.array([100, 75]), 20),
-    Obstacle(np.array([200, 200]), 30),
-    Obstacle(np.array([300, 300]), 40)
+    # Obstacle(np.array([100, 75]), 20),
+    # Obstacle(np.array([200, 200]), 30),
+    # Obstacle(np.array([300, 300]), 40)
+    Obstacle(np.array([300, 370]), 40),
 ]
 
 while True:
@@ -115,7 +123,8 @@ while True:
             break
 
     # Check if the current position is out of the map
-    if start[0] < 0 or start[0] >= map_size[0] or start[1] < 0 or start[1] >= map_size[1]:
+    if start[0] < 0 or start[0] >= map_size[1] or start[1] < 0 or start[1] >= map_size[0]:
+        print(start)
         print('Out of the map!')
         break
     time.sleep(0.01)
