@@ -44,6 +44,7 @@ class LinkedThrusters:
         self.thrust1_ratio = thruster1.max_thrust / self.max_thrust
         self.thrust2_ratio = thruster2.max_thrust / self.max_thrust
         self.thrust = 0.0
+        self.position = thruster1.position
 
     def set_thrust(self, thrust : float):
         self.thrust = np.clip(thrust, -self.max_thrust, self.max_thrust)
