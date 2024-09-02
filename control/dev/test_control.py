@@ -29,7 +29,7 @@ Global Interface:
 
 import time
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from comms_core import Server, Logger
 from comms_core import CustomSocketMessage as csm
 
@@ -41,11 +41,11 @@ def set_mode(mode, msg : Dict[str, Any]):
    msg['set_mode'] = mode
    return msg
 
-def set_target_vector(vector : List[float, float], msg : Dict[str, Any]):
+def set_target_vector(vector : Tuple[float, float], msg : Dict[str, Any]):
    msg['target_vector'] = vector
    return msg
 
-def set_target_position(position : List[float, float], msg : Dict[str, Any]):
+def set_target_position(position : Tuple[float, float], msg : Dict[str, Any]):
    msg['target_position'] = position
    return msg
 
@@ -61,15 +61,17 @@ def set_debug(debug : bool, msg : Dict[str, Any]):
    msg['debug'] = debug
    return msg
 
-def set_raw_motor_power(power : List[float, float], msg : Dict[str, Any]):
+def set_raw_motor_power(power : Tuple[float, float], msg : Dict[str, Any]):
    msg['raw_motor_power'] = power
    return msg
     
 def dummy_callback(data, addr):
-   print(f"Got data from {addr}")
+   pass
+   # print(f"Got data from {addr}")
 
 # Create a server object
 server = Server(default_callback=dummy_callback)
+server.start()
 
 # Create a logger object
 logger = Logger("test_control")
@@ -189,11 +191,12 @@ while True:
       data = ask_for_input(">> ")
       if data == False:
          print("Exiting the terminal...")
+         server.stop()
          exit()
       to_send = process_input(data, to_send)
       if to_send == False:
          print("Exiting the terminal...")
+         server.stop()
          exit()
       if to_send == None:
          break
-
