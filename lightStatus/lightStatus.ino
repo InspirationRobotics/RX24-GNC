@@ -2,10 +2,12 @@
 
 
 #define NUM_LEDS 300
-#define DATA_PIN 6
+#define DATA_PIN 7
+#define BACKUP_DATA_PIN 0
 
 #define INTERNAL_LED_PIN 13
 #define KILL_DETECT_PIN A0
+#define BUTTON_PIN 3
 
 CRGB leds[NUM_LEDS];
 
@@ -26,14 +28,25 @@ String incoming_data = "";
 bool KILLED = false;
 bool TELE = true; // If FALSE means in Automode
 
+bool DISABLED = false;
+
 void setup() {
   // put your setup code here, to run once:
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   pinMode(INTERNAL_LED_PIN, OUTPUT);
   pinMode(KILL_DETECT_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   Serial.begin(115200);
 
   digitalWrite(INTERNAL_LED_PIN, LOW);
+}
+
+
+void check_disable() {
+  if(digitalRead(BUTTON_PIN) == LOW) {
+    DISABLED = !DISABLED;
+    delay(2000);
+  }
 }
 
 void check_kill() {
@@ -63,6 +76,7 @@ void change_mode() {
       Serial.println("SWITCHED TO AUTO STATUS");
     }
   }
+  check_disable();
   check_kill();
 }
 
@@ -71,6 +85,10 @@ void show_color(CRGB color) {
   FastLED.show();
 }
 
+void show_disabled() {
+  digitalWrite(INTERNAL_LED_PIN, HIGH);
+  show_color(BLACK);
+}
 
 void show_killed() {
   digitalWrite(INTERNAL_LED_PIN, HIGH);
@@ -96,6 +114,10 @@ void show_auto() {
 void change_status() {
   change_mode();
 
+  if(DISABLED) {
+    show_disabled();
+    return; 
+  }
   if(KILLED) {
     show_killed();
     return;
