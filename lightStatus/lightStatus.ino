@@ -27,8 +27,10 @@ String incoming_data = "";
 
 bool KILLED = false;
 bool TELE = true; // If FALSE means in Automode
-
 bool DISABLED = false;
+
+unsigned long start_press_time = 0;
+unsigned long press_time = 200;
 
 void setup() {
   // put your setup code here, to run once:
@@ -44,8 +46,13 @@ void setup() {
 
 void check_disable() {
   if(digitalRead(BUTTON_PIN) == LOW) {
-    DISABLED = !DISABLED;
-    delay(2000);
+    start_press_time = millis();
+    while(digitalRead(BUTTON_PIN) == LOW) {
+      delay(20);
+    }
+    if(millis() - start_press_time > press_time) {
+      DISABLED = !DISABLED;
+    }
   }
 }
 
@@ -74,6 +81,14 @@ void change_mode() {
     else if(incoming_data=="11") {
       TELE = false;
       Serial.println("SWITCHED TO AUTO STATUS");
+    }
+    else if(incoming_data=="33") {
+      DISABLED = true;
+      Serial.println("DISABLED LED STATUS");
+    }
+    else if(incoming_data=="44") {
+      DISABLED = false;
+      Serial.println("ENABLED LED STATUS");
     }
   }
   check_disable();
