@@ -77,17 +77,17 @@ class GPSVisualizer:
             self.frame = cv2.circle(self.frame, (x, y), 1, (0, 0, 255), -1)
             # draw the blue point on top of the frame
             frame = cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
-            # draw the green point for the target
-            if ts in self.target.keys():
-                x, y = self.map_obj.to_pixels(self.target[ts])
-                x, y = self.rescale(x, y)
-                frame = cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             # draw the green heading arrow
             heading = self.heading.get(ts, None)
             if heading is not None:
                 dx, dy = self.convert_heading_to_arrow(heading + self.heading_offset)
                 x1, y1 = x + dx, y + dy
                 frame = cv2.arrowedLine(frame, (x, y), (x1, y1), (0, 0, 0), 2, tipLength=0.5)
+            # draw the green point for the target
+            if ts in self.target.keys():
+                x, y = self.map_obj.to_pixels(self.target[ts])
+                x, y = self.rescale(x, y)
+                frame = cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             # print the time on the frame
             stamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
             cv2.putText(frame, stamp, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
