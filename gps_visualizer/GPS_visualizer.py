@@ -2,14 +2,24 @@ import smopy
 import cv2
 import numpy as np
 from pathlib import Path
-from parse_data import DataParser
+from parse_data import DataParser, DataParser2
 from datetime import datetime
 
 class GPSVisualizer:
 
-    def __init__(self, file_path : Path | str, *, zoom : int = 19, playback_speed : int = 10, frame_size : int = 600, heading_offset : float = 0):
-        dp = DataParser(file_path)
-        self.position, self.heading = dp.parse_data()
+    def __init__(self, file_path : Path | str, *, zoom : int = 19, playback_speed : int = 10, frame_size : int = 600, heading_offset : float = 0, dp2 = False):
+        
+        self.target = {}
+        self.position = {}
+        self.heading = {}
+        
+        if dp2:
+            dp = DataParser2(file_path)
+            self.position, self.target, self.heading = dp.parse_data()
+        else:
+            dp = DataParser(file_path)
+            self.position, self.heading = dp.parse_data()
+        
         self.playback_speed = playback_speed
         self.zoom = zoom
         self.frame_size = frame_size
@@ -67,6 +77,11 @@ class GPSVisualizer:
             self.frame = cv2.circle(self.frame, (x, y), 1, (0, 0, 255), -1)
             # draw the blue point on top of the frame
             frame = cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+            # draw the green point for the target
+            if ts in self.target.keys():
+                x, y = self.map_obj.to_pixels(self.target[ts])
+                x, y = self.rescale(x, y)
+                frame = cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             # draw the green heading arrow
             heading = self.heading.get(ts, None)
             if heading is not None:
@@ -96,6 +111,7 @@ class GPSVisualizer:
 
 if __name__ == "__main__":
     # file_path = "logs_6_06_24/GPSlog_1717697944.txt"
-    file_path = "logs_6_06_24/GPSlog_1717701866.txt"
-    visualizer = GPSVisualizer(file_path, frame_size=900)
+    # file_path = "logs_6_06_24/GPSlog_1717701866.txt"
+    file_path = "logs_9_08_24/motor_core.log"
+    visualizer = GPSVisualizer(file_path, frame_size=900, dp2=True, zoom=17)
     visualizer.draw()
