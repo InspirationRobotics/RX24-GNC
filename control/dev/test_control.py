@@ -101,7 +101,7 @@ def ask_for_input(msg):
       return None
    return data
 
-def process_input(data, to_send):
+def process_input(data, to_send : dict):
 
    if data == "1":
       mode = ask_for_input("Enter the mode (0, 1, 2): ")
@@ -121,12 +121,15 @@ def process_input(data, to_send):
       return to_send
    
    if data == "3":
-      lat = ask_for_input("Enter the target latitude: ")
-      if lat == False or lat == None:
-         return lat
-      lon = ask_for_input("Enter the target longitude: ")
-      if lon == False or lon == None:
-         return lon
+      # lat = ask_for_input("Enter the target latitude: ")
+      # if lat == False or lat == None:
+      #    return lat
+      # lon = ask_for_input("Enter the target longitude: ")
+      # if lon == False or lon == None:
+      #    return lon
+      #32.91426471087947, -117.10186806192723
+      lat = 32.91426471087947
+      lon = -117.10186806192723
       to_send = set_target_position([float(lat), float(lon)], to_send)
       return to_send
    
@@ -168,6 +171,9 @@ def process_input(data, to_send):
 
    if data == "send":
       server.send(csm.encode(to_send))
+      if "target_position" in to_send.keys() or "target_heading" in to_send.keys():
+         while input() != "q":
+            server.send(csm.encode(to_send))
       return {}
     
    return False
@@ -200,3 +206,9 @@ while True:
          exit()
       if to_send == None:
          break
+
+
+'''
+32.9513
+-117.10118
+'''
