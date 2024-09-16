@@ -95,7 +95,7 @@ class DataParser2:
             return self.position, self.target, self.heading
 
 if __name__ == "__main__":
-    file_path = Path("logs_9_08_24/motor_core.log")
+    file_path = Path("logs_9_15_24/motor_core1.log")
     data_parser = DataParser2(file_path)
     data_parser.parse_data()
     print(data_parser.heading)

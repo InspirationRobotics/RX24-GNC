@@ -87,7 +87,7 @@ class GPSVisualizer:
             if ts in self.target.keys():
                 x, y = self.map_obj.to_pixels(self.target[ts])
                 x, y = self.rescale(x, y)
-                frame = cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+                frame = cv2.circle(frame, (x, y), 5, (6, 64, 43), -1)
             # print the time on the frame
             stamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
             cv2.putText(frame, stamp, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
@@ -112,6 +112,6 @@ class GPSVisualizer:
 if __name__ == "__main__":
     # file_path = "logs_6_06_24/GPSlog_1717697944.txt"
     # file_path = "logs_6_06_24/GPSlog_1717701866.txt"
-    file_path = "logs_9_08_24/motor_core.log"
+    file_path = "logs_9_15_24/motor_core2.log"
     visualizer = GPSVisualizer(file_path, frame_size=900, dp2=True, zoom=17)
     visualizer.draw()

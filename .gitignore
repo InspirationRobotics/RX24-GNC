@@ -3,3 +3,5 @@ __pycache__
 *.png
 *.DS_Store
 *.log
+
+!gps_visualizer/logs*/*.log
