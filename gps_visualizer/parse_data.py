@@ -60,7 +60,10 @@ class DataParser2:
             return tuple(data)
 
         def parse_target_data(self, data : str):
-            data = data.split('Target Position: [', 1)[1]
+            try:
+                data = data.split('Target Position: [', 1)[1]
+            except:
+                data = data.split('Target Position: (', 1)[1]
             data = data[:-1]
             data = data.split(', ')
             data = [float(i) for i in data]
