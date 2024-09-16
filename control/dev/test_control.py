@@ -128,10 +128,28 @@ def process_input(data, to_send : dict):
       # if lon == False or lon == None:
       #    return lon
       #32.91426471087947, -117.10186806192723
-      lat = 32.91426471087947
-      lon = -117.10186806192723
-      to_send = set_target_position([float(lat), float(lon)], to_send)
-      return to_send
+
+      # lat = 32.91426471087947
+      # lon = -117.10186806192723
+
+      point1 = (32.91514313674598, -117.10053347345651)
+      point2 = (32.91519019795828, -117.10160586313923)
+      point3 = (32.91474180227439, -117.10084539786419)
+      point4 = (32.91469620258607, -117.10029768180299)  
+      points = [point1, point2, point3, point4]
+      cnt = -1
+      while True:
+         val = input()
+         if val == " ":
+            cnt+=1
+         if val == "q":
+            break
+         if cnt > 3:
+            break
+         lat, lon = points[cnt]
+         to_send = set_target_position([float(lat), float(lon)], to_send)
+         server.send(csm.encode(to_send))
+      return {}
    
    if data == "4":
       heading = ask_for_input("Enter the target heading: ")
