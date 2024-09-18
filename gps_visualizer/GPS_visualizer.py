@@ -112,6 +112,6 @@ class GPSVisualizer:
 if __name__ == "__main__":
     # file_path = "logs_6_06_24/GPSlog_1717697944.txt"
     # file_path = "logs_6_06_24/GPSlog_1717701866.txt"
-    file_path = "logs_9_15_24/motor_core2.log"
+    file_path = "logs_9_18_24/motor_core3.log"
     visualizer = GPSVisualizer(file_path, frame_size=900, dp2=True, zoom=17)
     visualizer.draw()
