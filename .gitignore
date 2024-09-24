@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+*.png
+*.DS_Store
+*.log
+
+!gps_visualizer/logs*/*.log
