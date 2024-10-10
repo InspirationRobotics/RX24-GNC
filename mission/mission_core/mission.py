@@ -104,3 +104,34 @@ class MissionHandler:
         """
         self.heartbeat_active = False
         self.heartbeat_thread.join()
+
+
+'''
+Notes:
+Basic Level:
+- Instantiate Perception
+- Instantiate Server -> Server from comms_core
+- define a callback
+Run:
+- run the callback pass in frame/data
+- output of the callback -> parse what will need to be sent to boat 
+ - Changing cameras software stuff
+ - target vector -> goto this waypoint
+MissionHandler should specify: (mode 0 is target vector, mode 2 is waypoint)
+- Sending target vector, waypoint, could be mode
+
+
+Perception: 
+Occupancy grid, model detection, etc -> Callback funciton
+Callback function -> I define -> Motor/movement commands (waypoint, rotate, target vector, poshold) -> New set of camera ports, models, 
+
+First: define valid keyword arguments that any callback can output
+Input to callback function should also be a dictionary (different from output)
+
+Next: Ideally have a thread that's sending data every second. To low-level control.
+
+Have a callback for when we get gps data from the lowlevel control
+ - should be passed into callback above
+
+
+'''
