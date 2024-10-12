@@ -5,6 +5,7 @@ from typing import Dict, List, Any
 from comms_core import Server, Logger, CustomSocketMessage as csm
 from perception_core import Perception, CameraData, Results
 
+from mission_core.mission_node import MissionNode
 from missions.mission_template import SimpleMission
 
 '''
@@ -58,6 +59,8 @@ class MissionHandler(Logger):
         self.server = Server(default_callback=self._server_callback)
         self.perception = Perception()
 
+        self.mission_node = MissionNode()
+
         self.position_data : PositionData = None
 
         self.active = False
@@ -75,6 +78,7 @@ class MissionHandler(Logger):
     def _server_callback(self, data, addr):
         data = csm.decode(data, as_interface=True)
         self.position_data = PositionData(data.position, data.heading)
+        self.mission_node.send_gps(self.position_data)
 
     def __parse_gnc_cmd(self, gnc_cmd: Dict[str, Any]):
         with self.send_lock:
@@ -117,6 +121,7 @@ class MissionHandler(Logger):
     def start(self):
         self.log("Starting Mission Handler.")
         self.active = True
+        self.mission_node.start()
         self.callback_thread.start()
         self.send_thread.start()
 
@@ -125,6 +130,7 @@ class MissionHandler(Logger):
         self.active = False
         self.callback_thread.join()
         self.send_thread.join()
+        self.mission_node.stop()
 
     def start_mission(self):
         self.log("Starting Missions.")
