@@ -24,8 +24,23 @@ class SimpleMission:
 
     def __str__(self):
         return self.__class__.__name__
+    
+    def mission_heartbeat(self):
+        '''
+        The heartbeat format can be found in the Team Handbook V3 Appendix D (Page 55).
+        The heartbeat must specify all relevant information about the mission BESIDES the following:
+         - Date
+         - Time
+         - Team ID
+         - Checksum
+        It must return a list of the required information in the correct order.
+        For example, Scan the Code would be: 
+        heartbeat = ["$RXCOD", self.light_pattern]
+        '''
+        heartbeat = []
+        return heartbeat
 
-    def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict]:
+    def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict, Dict]:
         '''
         Camera data is a dictionary with the following format:
         {

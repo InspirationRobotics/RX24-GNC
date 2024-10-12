@@ -68,7 +68,7 @@ class MissionHandler(Logger):
         self.send_thread = Thread(target=self.__send_loop)
         self.send_lock = Lock()
         self.to_send = {}
-
+        
         self.log("Mission Handler Initialized.")
         self.start()
 
@@ -110,7 +110,7 @@ class MissionHandler(Logger):
         while self.active:
             with self.send_lock:
                 self.to_send["heartbeat"] = time.time()
-                self.server.send(csm.encode(self.to_send))
+                self.server.send(csm.encode(self.to_send), "192.168.3.6")
                 self.to_send = {}
             time.sleep(0.2)
 
@@ -129,6 +129,14 @@ class MissionHandler(Logger):
     def start_mission(self):
         self.log("Starting Missions.")
         self.next_mission()
+
+    def pause_mission(self):
+        self.log("Pausing Missions.")
+        self.callback_active = False
+
+    def resume_mission(self):
+        self.log("Resuming Missions.")
+        self.callback_active = True
 
     def next_mission(self):
         self.callback_active = False
