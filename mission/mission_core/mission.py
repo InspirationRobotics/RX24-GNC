@@ -6,8 +6,8 @@ from typing import Dict, List, Any
 from comms_core import Server, Logger, CustomSocketMessage as csm
 from perception_core import Perception, CameraData, Results
 
-from mission_core.mission_node import MissionNode, PositionData
-from missions.mission_template import SimpleMission
+from .mission_node import MissionNode, PositionData
+from .missions.mission_template import SimpleMission
 
 '''
 The concept of this class is simple.
@@ -48,6 +48,8 @@ class MissionHandler(Logger):
     def __init__(self, mission_list: List[SimpleMission] = None):
         super().__init__("MissionHandler")
         self.mission_list = mission_list if mission_list is not None else []
+        if not isinstance(self.mission_list, list):
+            self.mission_list = [self.mission_list]
         self.current_mission : SimpleMission = None
 
         self.server = Server(default_callback=self._server_callback)
@@ -72,7 +74,7 @@ class MissionHandler(Logger):
 
     def _server_callback(self, data, addr):
         data = csm.decode(data, as_interface=True)
-        self.position_data = PositionData(data.position, data.heading)
+        self.position_data = PositionData(data.current_position, data.current_heading)
         self.mission_node.send_gps(self.position_data)
 
     def __parse_gnc_cmd(self, gnc_cmd: Dict[str, Any]):
@@ -108,14 +110,18 @@ class MissionHandler(Logger):
     def __send_loop(self):
         while self.active:
             with self.send_lock:
-                self.to_send["heartbeat"] = time.time()
-                self.server.send(csm.encode(self.to_send), "192.168.3.6")
+                self.to_send["heartbeat"] = True
+                self.server.send(csm.encode(self.to_send))
                 self.to_send = {}
             time.sleep(0.2)
+
+    def _get_occupancy(self):
+        return self.mission_node.get_occupancy()
 
     def start(self):
         self.log("Starting Mission Handler.")
         self.active = True
+        self.server.start()
         self.mission_node.start()
         self.callback_thread.start()
         self.send_thread.start()
@@ -126,6 +132,7 @@ class MissionHandler(Logger):
         self.callback_thread.join()
         self.send_thread.join()
         self.mission_node.stop()
+        self.server.stop()
         rclpy.shutdown()
 
     def start_mission(self):

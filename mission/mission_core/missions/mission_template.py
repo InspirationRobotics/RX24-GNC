@@ -8,7 +8,7 @@ Comments are provided to explain the purpose of each variable and function and c
 from typing import Dict, Tuple
 
 from comms_core import Logger
-from mission_core import PositionData
+from ..mission_node import PositionData
 from perception_core import CameraData, Results
 
 
@@ -19,7 +19,7 @@ class SimpleMission(Logger):
     init_perc_cmd = {
         "start": ["center"],
         "stop": ["port", "starboard"],
-        "record": ["center"],
+        # "record": ["center"],
     }
 
     def __init__(self):
