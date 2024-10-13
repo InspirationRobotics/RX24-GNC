@@ -6,10 +6,13 @@ Comments are provided to explain the purpose of each variable and function and c
 '''
 
 from typing import Dict, Tuple
+
+from comms_core import Logger
 from mission_core import PositionData
 from perception_core import CameraData, Results
 
-class SimpleMission:
+
+class SimpleMission(Logger):
 
     # Define the initial perception commands here (if any)
     # This dictionary must exist, but some commands are entered as examples
@@ -20,6 +23,7 @@ class SimpleMission:
     }
 
     def __init__(self):
+        super().__init__(str(self))
         pass
 
     def __str__(self):
@@ -61,6 +65,7 @@ class SimpleMission:
             position_data.heading : float
 
         The output perc_cmd has the following format (does not have to be filled):
+        You only need to put any arguements in here if you want to change the current perception config.
         {
             "start": ["camera_name"],
             "stop": ["camera_name"],
@@ -78,6 +83,11 @@ class SimpleMission:
             "waypoint": tuple, # The target waypoint to set the GNC to (sending any other commands will override this)
             "end_mission": bool # Whether to end the mission
         }
+
+        You can log/print data by using the self.log() function inherited from the Logger class.
+        It is f-string compatible so you can call it like so:
+            self.log(f"Position: {position_data.position}")
+            or just self.log("hi there") or self.log(variable)
 
         '''
         perc_cmd = {}
