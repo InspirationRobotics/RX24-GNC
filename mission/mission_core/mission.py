@@ -1,4 +1,5 @@
 import time
+import rclpy
 from threading import Thread, Lock
 from typing import Dict, List, Any
 
@@ -59,6 +60,7 @@ class MissionHandler(Logger):
         self.server = Server(default_callback=self._server_callback)
         self.perception = Perception()
 
+        rclpy.init(args=None)
         self.mission_node = MissionNode()
 
         self.position_data : PositionData = None
@@ -131,6 +133,7 @@ class MissionHandler(Logger):
         self.callback_thread.join()
         self.send_thread.join()
         self.mission_node.stop()
+        rclpy.shutdown()
 
     def start_mission(self):
         self.log("Starting Missions.")

@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from typing import Dict, Tuple
 from threading import Thread, Lock
 
 import rclpy
@@ -28,7 +29,7 @@ class OccupancyData:
         self.val_range = grid.value_range
         self.val_zero_point = grid.value_zero_point
         # Cells
-        self.cells = {}
+        self.cells : Dict[Tuple[int, int], int] = {}
         cell : Cell
         for cell in grid.cells:
             self.cells[(cell.x_coord, cell.y_coord)] = cell.value
@@ -84,3 +85,44 @@ class MissionNode(Node):
         while self.active:
             self.lidar_executor.spin_once()
             time.sleep(1/20)
+
+if __name__ == '__main__':
+    import cv2
+
+    def visualize_occupancy(occupancy: OccupancyData):
+        if occupancy is None:
+            return
+        x_size = occupancy.x_range[1] - occupancy.x_range[0] + 1 + 60
+        y_size = occupancy.y_range[1] - occupancy.y_range[0] + 1 + 60
+        frame = np.zeros((y_size, x_size))
+
+        def translate(coord):
+            x = coord[0] - occupancy.x_range[0] + 30
+            y = y_size - (coord[1] - occupancy.y_range[0] + 30)
+            return x, y
+
+        for coord in occupancy.cells:
+            x, y = translate(coord)
+            frame[y, x] = occupancy.cells[coord] / occupancy.val_range[1]
+
+        frame = np.array(frame * 255, dtype=np.uint8)
+        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        frame = cv2.circle(frame, translate((0, 0)), 3, (0, 255, 0), -1)
+        show_frame = cv2.resize(frame, (800,800), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow("Occupancy Grid", show_frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # Test the MissionNode with occupancy grid visualization
+    rclpy.init()
+    mission_node = MissionNode()
+    mission_node.start()
+    while True:
+        try:
+            mission_node.send_gps(PositionData((32.946099210867345, -117.13801643179173), 0))
+            occupancy = mission_node.get_occupancy()
+            visualize_occupancy(occupancy)
+            time.sleep(0.1)
+        except KeyboardInterrupt:
+            break
+    rclpy.shutdown()
