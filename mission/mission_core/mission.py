@@ -6,7 +6,7 @@ from typing import Dict, List, Any
 from comms_core import Server, Logger, CustomSocketMessage as csm
 from perception_core import Perception, CameraData, Results
 
-from mission_core.mission_node import MissionNode
+from mission_core.mission_node import MissionNode, PositionData
 from missions.mission_template import SimpleMission
 
 '''
@@ -42,13 +42,6 @@ gnc_cmd will have:
 While the mission_handler is active, it will be sending a heartbeat to the LLC module at 5hz along with any of the GNC commands.
 
 '''
-
-class PositionData:
-    def __init__(self, position: tuple, heading: float):
-        self.position = position
-        self.lat = position[0] if position is not None else None
-        self.lon = position[1] if position is not None else None
-        self.heading = heading
 
 class MissionHandler(Logger):
     

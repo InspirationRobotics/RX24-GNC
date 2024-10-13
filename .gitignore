@@ -3,5 +3,6 @@ __pycache__
 *.png
 *.DS_Store
 *.log
+*.egg-info
 
 !dev/gps_visualizer/logs*/*.log

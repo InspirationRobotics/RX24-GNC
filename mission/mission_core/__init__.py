@@ -1,2 +1,2 @@
-from mission_node import MissionNode
-from mission import MissionHandler, PositionData
+from mission import MissionHandler
+from mission_node import MissionNode, PositionData

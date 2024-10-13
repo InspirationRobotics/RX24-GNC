@@ -8,13 +8,20 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
-from mission_core.mission import PositionData
 from interfaces.msg import LatLonHead, Occupancy, Grid, Cell
 
 '''
 A simple ROS node which publishes lat, lon, and heading data to the occupancy node every time a method is called.
 It also subscribes to the Occupancy message and updates an accessable variable with the latest occupancy grid data.
 '''
+
+class PositionData:
+    def __init__(self, position: tuple, heading: float):
+        self.position = position
+        self.lat = position[0] if position is not None else None
+        self.lon = position[1] if position is not None else None
+        self.heading = heading
+
 
 class OccupancyData:
     def __init__(self, msg: Occupancy):
@@ -47,8 +54,8 @@ class MissionNode(Node):
     def _init_pubsubs(self):
         sub_group = MutuallyExclusiveCallbackGroup()
         pub_group = MutuallyExclusiveCallbackGroup()
-        self.occupancy_sub = self.create_subscription(Occupancy, '/RX/occupancy', self._occupancy_callback, 10, callback_group=sub_group)
-        self.latlonhead_pub = self.create_publisher(LatLonHead, '/RX/latlonhead', 10, callback_group=pub_group)
+        self.occupancy_sub = self.create_subscription(Occupancy, '/RX/occupancy_grid', self._occupancy_callback, 10, callback_group=sub_group)
+        self.latlonhead_pub = self.create_publisher(LatLonHead, '/RX/gps', 10, callback_group=pub_group)
 
     def _occupancy_callback(self, msg: Occupancy):
         self.occupancy = OccupancyData(msg)
@@ -102,6 +109,8 @@ if __name__ == '__main__':
             return x, y
 
         for coord in occupancy.cells:
+            if occupancy.cells[coord] <= occupancy.val_zero_point:
+                continue
             x, y = translate(coord)
             frame[y, x] = occupancy.cells[coord] / occupancy.val_range[1]
 
@@ -110,8 +119,7 @@ if __name__ == '__main__':
         frame = cv2.circle(frame, translate((0, 0)), 3, (0, 255, 0), -1)
         show_frame = cv2.resize(frame, (800,800), interpolation=cv2.INTER_NEAREST)
         cv2.imshow("Occupancy Grid", show_frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        cv2.waitKey(1) & 0xFF
 
     # Test the MissionNode with occupancy grid visualization
     rclpy.init()
@@ -119,10 +127,13 @@ if __name__ == '__main__':
     mission_node.start()
     while True:
         try:
-            mission_node.send_gps(PositionData((32.946099210867345, -117.13801643179173), 0))
+            mission_node.send_gps(PositionData((32.946099210867345, -117.13801643179173), 0.0))
             occupancy = mission_node.get_occupancy()
             visualize_occupancy(occupancy)
             time.sleep(0.1)
         except KeyboardInterrupt:
             break
+    
+    cv2.destroyAllWindows()
+    mission_node.stop()
     rclpy.shutdown()
