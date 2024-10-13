@@ -21,20 +21,18 @@ class SimpleMission:
         "record": ["center"],
         "stop_record": ["port", "starboard"],
         "load_model": [("center", "ML_Resources/stcA.pt")],
-        "stop_model": ["port", "starboard"]
     }
 
     def __init__(self):
         self.records = {"123":0, "132":0, "213":0, "231":0, "312":0, "321":0 }
+        self.lookup = {0:'Black',1:'Blue',2:'Green',3:'Red'}
         self.debug = False
         self.storageArray = []
         self.stringAnalyzed = []
         self.max_value = 0
         self.light_pattern = []
+        self.countThreshold = 3
         
-        
-        
-
     def __str__(self):
         return self.__class__.__name__
     
@@ -50,7 +48,7 @@ class SimpleMission:
         For example, Scan the Code would be: 
         heartbeat = ["$RXCOD", self.light_pattern]
         '''
-        heartbeat = []
+        heartbeat = ["$RXCOD", self.light_pattern]
         return heartbeat
 
     def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict, Dict]:
@@ -95,43 +93,35 @@ class SimpleMission:
         '''
         
         # Run one yolo inference on the provided frame at camera_data.frame
-        self.storageArray = camera_data.results[0]
+        center_camera_data = camera_data.get("center")
+        self.storageArray.append(center_camera_data.results[0])
         
         if(len(self.storageArray) != 0):
             if(self.debug):
-                print("Interim processing")
-                print(self.storageArray)
+                self.log("Interim processing")
+                self.log(self.storageArray)
             returnVal = filter(self.storageArray)
             records = self.analyze(returnVal)
 
             self.colors, self.pattern = self.results(records)
             if(self.debug):
-                print("printing results")
-                print(self.colors[0] + self.colors[1] + self.colors[2])
-                print("printing dict outside")
-                print(records)
+                self.log("self.logging results")
+                self.log(self.colors[0] + self.colors[1] + self.colors[2])
+                self.log("self.logging dict outside")
+                self.log(records)
             
             max_vote = records.get(self.pattern)
             if max_vote is None:
                 max_vote = 0
-            # if(max_vote > 0):
-            #     # Want to update colors for heartbeat
-            #     update_colors_on_server(colors, max_vote, len(storageArray))
-            # else:
-            #     # No Colors to update, can just say black
-            #     update_colors_on_server(["Black", "Black", "Black"], 0, len(storageArray))
+            if(max_vote > 0):
+                self.light_pattern = self.colors
+            if(max_vote >= self.countThreshold):
+                gnc_cmd = {"end_mission": True}
+            else:
+                # No Colors to update, can just say black
+                self.light_pattern = ["Black", "Black", "Black"]
         
-        
-        
-        
-        perc_cmd = {
-            "start": ["center"],
-            "stop": ["port", "starboard"],
-            "record": ["center"],
-            "stop_record": ["port", "starboard"],
-            "load_model": [("center", "ML_Resources/stcA.pt")],
-            "stop_model": ["port", "starboard"]
-        }
+        perc_cmd = {}
         gnc_cmd = {"poshold": True}
         return perc_cmd, gnc_cmd
 
@@ -141,9 +131,15 @@ class SimpleMission:
         This function is called when the run function returns end_mission = True 
         or when the mission handler decides to end the mission.
         '''
-        pass
+        
+        init_perc_cmd = {
+        "stop": ["port", "starboard", "center"],
+        }
+        
+        return init_perc_cmd
+        
     
-    def analyze(stringAnalyzed, debug=False):
+    def analyze(self, stringAnalyzed, debug=False):
         """Analyzes input string and adds votes to record
 
         Args:
@@ -155,33 +151,33 @@ class SimpleMission:
         records = {"123":0, "132":0, "213":0, "231":0, "312":0, "321":0 }
 
         if(debug):    
-            print("Analysis started")
+            self.log("Analysis started")
 
         val = "".join(stringAnalyzed)
         
         if(debug):
-            print(f"joined: {val}")
-        #everything is now combined and we want to split on black (0)
+            self.log(f"joined: {val}")
+        # Everything is now combined and we want to split on black (0)
 
         splitVal = val.split('0')
 
-        # updating all the counts in records
+        # Updating all the counts in records
         for i in splitVal:
             if i in records:
                 records[i] += 1
             else:
                 if(debug):
-                    print(f"Ignoring invalid key: {i}")
+                    self.log(f"Ignoring invalid key: {i}")
         
             
         if(debug):
-            print("Analysis ended")
-            print("records at end of analysis: ")
-            print(records)
+            self.log("Analysis ended")
+            self.log("records at end of analysis: ")
+            self.log(records)
         return records
         
     
-    def filter(storageArray, debug=False):
+    def filter(self, storageArray, debug=False):
         """Filters string of inputs by lambda group function
 
         Args:
@@ -191,7 +187,7 @@ class SimpleMission:
             String: Raw compressed string of filtered detections
         """
         if(debug):
-            print("Filtering started")
+            self.log("Filtering started")
         stringAnalyzed = []
             
         analyzed = [key for key, _group in groupby(storageArray)]
@@ -199,9 +195,9 @@ class SimpleMission:
             stringAnalyzed.append(str(i))
             
         if(debug):
-            print (analyzed)
+            self.log (analyzed)
                     
-            print("Filtering complete")
+            self.log("Filtering complete")
         return stringAnalyzed
     
     def results(self, records):
@@ -215,35 +211,30 @@ class SimpleMission:
         """
         
         if(self.debug):
-            print("Printing dictionary at start of results")
-            print(records)
+            self.log("self.loging dictionary at start of results")
+            self.log(records)
 
-
-
-
-        
-
-        pattern = max(records, key=records.get)
-        max_counter = records.get(pattern)
+        pattern_count = max(records, key=records.get)
+        max_counter = records.get(pattern_count)
         
         if (max_counter):
             if(self.debug):
-                print("Determined pattern based on the voting scheme from records")
-                print(pattern)
-                print(f"With vote of: {records.get(pattern)}")
-                print(f"{self.lookup[int(pattern[0])]},{self.lookup[int(pattern[1])]},{self.lookup[int(pattern[2])]}")
-            color1 = self.lookup[int(pattern[0])]
-            color2 = self.lookup[int(pattern[1])]
-            color3 = self.lookup[int(pattern[2])]
+                self.log("Determined pattern based on the voting scheme from records")
+                self.log(pattern_count)
+                self.log(f"With vote of: {records.get(pattern_count)}")
+                self.log(f"{self.lookup[int(pattern_count[0])]},{self.lookup[int(pattern_count[1])]},{self.lookup[int(pattern_count[2])]}")
+            color1 = self.lookup[int(pattern_count[0])]
+            color2 = self.lookup[int(pattern_count[1])]
+            color3 = self.lookup[int(pattern_count[2])]
             if(self.debug):
-                print("indv_colors")
-                print(color1)
-                print(color2)
-                print(color3)
+                self.log("indv_colors")
+                self.log(color1)
+                self.log(color2)
+                self.log(color3)
         
-            return [color1, color2, color3], pattern
+            return [color1, color2, color3], pattern_count
         
         else:
             if(self.debug):
-                print("No pattern cound in results")
+                self.log("No pattern cound in results")
             return ["Black", "Black", "Black"], 0
