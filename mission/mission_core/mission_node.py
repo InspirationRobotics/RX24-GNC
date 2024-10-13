@@ -75,6 +75,8 @@ class MissionNode(Node):
     def send_gps(self, data: PositionData):
         if data.position is None:
             return
+        if data.heading is None:
+            return
         msg = LatLonHead()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.latitude = data.lat

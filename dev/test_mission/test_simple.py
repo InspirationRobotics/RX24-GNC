@@ -36,8 +36,8 @@ if __name__ == "__main__":
     mission_handler.start_mission()
     while True:
         try:
-            occupancy = mission_handler._get_occupancy()
-            visualize_occupancy(occupancy)
+            # occupancy = mission_handler._get_occupancy()
+            # visualize_occupancy(occupancy)
             time.sleep(0.1)
         except KeyboardInterrupt:
             break
