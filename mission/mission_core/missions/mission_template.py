@@ -80,7 +80,7 @@ class SimpleMission(Logger):
             "heading": float, # The target heading for the boat to turn towards
             "vector": tuple, # The target vector for the boat to head towards (will override heading)
             "poshold": bool, # Whether to set the GNC to poshold mode (heading is not maintained but position is)
-            "waypoint": tuple, # The target waypoint to set the GNC to (sending any other commands will override this)
+            "waypoint": tuple, # The target waypoint to set the GNC to (This can also be a list of waypoints) (sending any other commands will override this)
             "end_mission": bool # Whether to end the mission
         }
 

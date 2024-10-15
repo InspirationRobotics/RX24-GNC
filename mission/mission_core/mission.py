@@ -35,7 +35,7 @@ gnc_cmd will have:
     "heading": float # The target heading to set the GNC to (will auto switch to Mode 0)
     "vector": tuple # The target vector to set the GNC to (will auto switch to Mode 0)
     "poshold": bool # Whether to set the GNC to poshold mode (switch to mode 1)
-    "waypoint": tuple # The target waypoint to set the GNC to (will auto switch to Mode 2)
+    "waypoint": tuple # The target waypoint to set the GNC to (will auto switch to Mode 2) (This can also be a list of waypoints)
     "end_mission": bool # Whether to end the mission
 }
 
