@@ -6,6 +6,7 @@ from typing import Dict, List, Any
 from comms_core import Server, Logger, CustomSocketMessage as csm
 from perception_core import Perception, CameraData, Results
 
+from .heartbeat import SystemHeartbeat, MissionHeartbeat
 from .mission_node import MissionNode, PositionData
 from .missions.mission_template import SimpleMission
 
@@ -68,14 +69,35 @@ class MissionHandler(Logger):
         self.send_thread = Thread(target=self.__send_loop)
         self.send_lock = Lock()
         self.to_send = {}
+
+        self.ground_station_thread = Thread(target=self._send_gs_heartbeat)
+        self.ground_station_ip = "192.168.3.20"
+        self.system_heartbeat : SystemHeartbeat = None
+        self.mission_heartbeat : MissionHeartbeat = None
+        self.gs_lock = Lock()
+        self.ground_station_thread.start()
         
         self.log("Mission Handler Initialized.")
         self.start()
+
+    def _send_gs_heartbeat(self):
+        while self.active:
+            with self.gs_lock:
+                heartbeats = {}
+                if self.system_heartbeat is not None:
+                    heartbeats["system"] = self.system_heartbeat
+                if self.mission_heartbeat is not None:
+                    heartbeats["mission"] = self.mission_heartbeat
+                if len(heartbeats) > 0:
+                    self.server.send(csm.encode(heartbeats), addr=self.ground_station_ip)
+            time.sleep(0.5)
 
     def _server_callback(self, data, addr):
         data = csm.decode(data, as_interface=True)
         self.position_data = PositionData(data.current_position, data.current_heading)
         self.mission_node.send_gps(self.position_data)
+        with self.gs_lock:
+            self.system_heartbeat = SystemHeartbeat(data.current_position, "2" if not data.killed else "3")
 
     def __parse_gnc_cmd(self, gnc_cmd: Dict[str, Any]):
         with self.send_lock:
@@ -102,6 +124,8 @@ class MissionHandler(Logger):
                 per_cmd, gnc_cmd = self.current_mission.run(self.perception.get_latest_data(), self.position_data)
                 end_mission = self.__parse_gnc_cmd(gnc_cmd)
                 self.perception.command_perception(per_cmd)
+                with self.gs_lock:
+                    self.mission_heartbeat = MissionHeartbeat(self.current_mission.mission_heartbeat())
                 if end_mission:
                     self.next_mission()
                 time.sleep(1/20)

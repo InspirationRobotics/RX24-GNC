@@ -27,7 +27,9 @@ class OccupancyData:
     def __init__(self, msg: Occupancy):
         # Occupancy data
         self.timestamp = msg.header.stamp.sec
-        self.origin = (msg.origin_latitude, msg.origin_longitude)
+        self.origin = msg.origin
+        self.position = msg.position[0:2]
+        self.heading = msg.position[2]
         self.cell_size = msg.cell_size
         # Grid data
         grid : Grid = msg.grid
@@ -100,6 +102,11 @@ class MissionNode(Node):
 if __name__ == '__main__':
     import cv2
 
+    def global_to_local(lat: float, lon: float, origin: tuple, cell_size: float):
+        x = (lat-origin[0]) * 111139
+        y = (lon-origin[1]) * 111139 * np.cos(np.radians(lat))
+        return int(x/cell_size), int(y/cell_size)
+
     def visualize_occupancy(occupancy: OccupancyData):
         if occupancy is None:
             return
@@ -118,11 +125,20 @@ if __name__ == '__main__':
             x, y = translate(coord)
             frame[y, x] = occupancy.cells[coord] / occupancy.val_range[1]
 
+        boat_pos = global_to_local(occupancy.position[0], occupancy.position[1], occupancy.origin, occupancy.cell_size)
+        boat_pos = translate(boat_pos)
         frame = np.array(frame * 255, dtype=np.uint8)
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-        frame = cv2.circle(frame, translate((0, 0)), 3, (0, 255, 0), -1)
-        show_frame = cv2.resize(frame, (800,800), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow("Occupancy Grid", show_frame)
+        cv2.circle(frame, boat_pos, 5, (0, 255, 0), -1)
+        # Draw an arrow representing the heading
+        heading = np.radians(occupancy.heading)
+        x1 = boat_pos[0]
+        y1 = boat_pos[1]
+        x2 = x1 + int(20 * np.sin(heading))
+        y2 = y1 - int(20 * np.cos(heading))
+        cv2.arrowedLine(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        # frame = cv2.resize(frame, (800,800), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow("Occupancy Grid", frame)
         cv2.waitKey(1) & 0xFF
 
     # Test the MissionNode with occupancy grid visualization
@@ -131,7 +147,7 @@ if __name__ == '__main__':
     mission_node.start()
     while True:
         try:
-            mission_node.send_gps(PositionData((32.946099210867345, -117.13801643179173), 0.0))
+            # mission_node.send_gps(PositionData((32.946099210867345, -117.13801643179173), 0.0))
             occupancy = mission_node.get_occupancy()
             visualize_occupancy(occupancy)
             time.sleep(0.1)
