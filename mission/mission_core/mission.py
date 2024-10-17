@@ -1,106 +1,166 @@
 import time
+import rclpy
 from threading import Thread, Lock
 from typing import Dict, List, Any
 
-class MissionHandler:
-    def __init__(self, mission, perception, gnc_control):
-        """
-        Initialize the MissionHandler.
-        :param mission: The current mission object (e.g., GoToTarget, SlalomCourse, etc.).
-        :param perception: The perception class (e.g., cameras, lidar).
-        :param gnc_control: The GNC (unsure how this works)
-        """
-        self.mission = mission  # The current mission
-        self.perception = perception  # Perception system (cameras, CV models)
-        self.gnc_control = gnc_control  # Control system (motors, navigation)
-        self.occupancy_grid = None  # Placeholder for occupancy grid
-        self.position = None  # Current position of the boat
-        self.frame = None  # Current camera frame
+from comms_core import Server, Logger, CustomSocketMessage as csm
+from perception_core import Perception, CameraData, Results
+
+from .mission_node import MissionNode, PositionData
+from .missions.mission_template import SimpleMission
+
+'''
+The concept of this class is simple.
+It is the main class that will handle the mission.
+
+It will have a callback function which will run at a fixed rate.
+The callback function will take in a dictionary with the camera data organized like so:
+{
+    "port": CameraData
+    "starboard": CameraData
+    "center": CameraData
+}
+Where CameraData is a class that contains the image frame and the results of a Yolo model (if running).
+
+The callback function will also take in a PositionData object which contains the current position and heading of the vehicle.
+The callback function will also take in the latest occupancy grid data. (format TBD)
+
+The callback function will output a dictionary with the following data:
+{
+    per_cmd: {} # Dictionary containing the commands for the perception module (defined in perception_core)
+    gnc_cmd: {} # Dictionary containing the commands for the GNC module
+}
+gnc_cmd will have:
+{
+    "heading": float # The target heading to set the GNC to (will auto switch to Mode 0)
+    "vector": tuple # The target vector to set the GNC to (will auto switch to Mode 0)
+    "poshold": bool # Whether to set the GNC to poshold mode (switch to mode 1)
+    "waypoint": tuple # The target waypoint to set the GNC to (will auto switch to Mode 2) (This can also be a list of waypoints)
+    "end_mission": bool # Whether to end the mission
+}
+
+While the mission_handler is active, it will be sending a heartbeat to the LLC module at 5hz along with any of the GNC commands.
+
+'''
+
+class MissionHandler(Logger):
+    
+    def __init__(self, mission_list: List[SimpleMission] = None):
+        super().__init__("MissionHandler")
+        self.mission_list = mission_list if mission_list is not None else []
+        if not isinstance(self.mission_list, list):
+            self.mission_list = [self.mission_list]
+        self.current_mission : SimpleMission = None
+
+        self.server = Server(default_callback=self._server_callback)
+        self.perception = Perception()
+
+        rclpy.init(args=None)
+        self.mission_node = MissionNode()
+
+        self.position_data : PositionData = None
+
+        self.active = False
+
+        self.callback_thread = Thread(target=self.__callback_loop)
+        self.callback_active = False
+
+        self.send_thread = Thread(target=self.__send_loop)
+        self.send_lock = Lock()
+        self.to_send = {}
         
-        # Heartbeat and locking
-        self.heartbeat_active = True
-        self.msg_lock = Lock()
-        self.msg = {}
-        
-        # Heartbeat thread to periodically send status messages
-        self.heartbeat_thread = Thread(target=self._send_heartbeat, daemon=True)
-        self.heartbeat_thread.start()
+        self.log("Mission Handler Initialized.")
+        self.start()
 
-    def load_occupancy_grid(self):
-        """
-        Placeholder for loading the occupancy grid.
-        """
-        # TODO: Load occupancy grid here (unsure how to do this)
-        self.occupancy_grid = "Simulated occupancy grid data"
+    def _server_callback(self, data, addr):
+        data = csm.decode(data, as_interface=True)
+        self.position_data = PositionData(data.current_position, data.current_heading)
+        self.mission_node.send_gps(self.position_data)
 
-    def position_callback(self, position):
-        """
-        Update the current boat position.
-        :param position: Tuple containing the latitude and longitude.
-        """
-        with self.msg_lock:
-            self.position = position
+    def __parse_gnc_cmd(self, gnc_cmd: Dict[str, Any]):
+        with self.send_lock:
+            if "heading" in gnc_cmd:
+                self.to_send["set_mode"] = 0
+                self.to_send["target_heading"] = gnc_cmd["heading"]
+            if "vector" in gnc_cmd:
+                self.to_send["set_mode"] = 0
+                self.to_send["target_vector"] = gnc_cmd["vector"]
+            if "poshold" in gnc_cmd:
+                if gnc_cmd["poshold"]:
+                    self.to_send["set_mode"] = 1
+            if "waypoint" in gnc_cmd:
+                self.to_send["set_mode"] = 2
+                self.to_send["target_position"] = gnc_cmd["waypoint"]
+            if "end_mission" in gnc_cmd:
+                self.to_send["set_mode"] = 0
+                return gnc_cmd["end_mission"]
+        return False
 
-    def frame_callback(self, frame):
-        """
-        Update the latest frame from the perception system.
-        :param frame: The current camera frame.
-        """
-        with self.msg_lock:
-            self.frame = frame
+    def __callback_loop(self):
+        while self.active:
+            while self.callback_active:
+                per_cmd, gnc_cmd = self.current_mission.run(self.perception.get_latest_data(), self.position_data)
+                end_mission = self.__parse_gnc_cmd(gnc_cmd)
+                self.perception.command_perception(per_cmd)
+                if end_mission:
+                    self.next_mission()
+                time.sleep(1/20)
+            time.sleep(0.5)
 
-    def run(self):
-        """
-        Main loop that runs the current mission.
-        """
-        while not self.mission.end:
-            # Update perception and occupancy grid data
-            self.frame_callback(self.perception.get_latest_frames())
-            self.load_occupancy_grid()  # To dynamically update, could be implemented incorrectly
-            
-            # Execute the mission logic
-            with self.msg_lock:
-                output = self.mission.run(self.frame, self.position, self.occupancy_grid)
-            
-            # Process the output and send relevant commands to GNC system
-            self.send_commands(output)
+    def __send_loop(self):
+        while self.active:
+            with self.send_lock:
+                self.to_send["heartbeat"] = True
+                self.server.send(csm.encode(self.to_send))
+                self.to_send = {}
+            time.sleep(0.2)
 
-            # For now Users will specify when to switch to a new mission
-            time.sleep(1)  # Add some delay to avoid running too fast
+    def _get_occupancy(self):
+        return self.mission_node.get_occupancy()
 
-    def send_commands(self, output: Dict[str, Any]):
-        """
-        Send the relevant commands from the mission output to the GNC system.
-        :param output: Dictionary containing the commands (target vector, heading, etc.).
-        TODO: need to talk about what exactly needs to be sent between
-        """
-        with self.msg_lock:
-            if "target_vector" in output:
-                self.gnc_control.set_target_vector(output["target_vector"])
-            if "target_position" in output:
-                self.gnc_control.set_target_position(output["target_position"])
-            if "target_heading" in output:
-                self.gnc_control.set_target_heading(output["target_heading"])
-            if "mission_state" in output:
-                print(f"Mission state: {output['mission_state']}")
+    def start(self):
+        self.log("Starting Mission Handler.")
+        self.active = True
+        self.server.start()
+        self.mission_node.start()
+        self.callback_thread.start()
+        self.send_thread.start()
 
-    def _send_heartbeat(self):
-        """
-        Heartbeat thread that periodically sends system status.
-        TODO: what should be in a heartbeat message? Should there be a heart beat between GNC and Misison? 
-        """
-        while self.heartbeat_active:
-            with self.msg_lock:
-                self.msg['heartbeat'] = "alive"
-                self.msg['current_position'] = self.position
-                self.msg['current_mission'] = type(self.mission).__name__
-                self.gnc_control.send_heartbeat(self.msg)
-            
-            time.sleep(1.5)  # Heartbeat interval
+    def stop(self):
+        self.log("Stopping Mission Handler.")
+        self.active = False
+        self.callback_thread.join()
+        self.send_thread.join()
+        self.mission_node.stop()
+        self.server.stop()
+        rclpy.shutdown()
 
-    def stop_heartbeat(self):
-        """
-        Stops the heartbeat thread when the MissionHandler is no longer needed.
-        """
-        self.heartbeat_active = False
-        self.heartbeat_thread.join()
+    def start_mission(self):
+        self.log("Starting Missions.")
+        self.next_mission()
+
+    def pause_mission(self):
+        self.log("Pausing Missions.")
+        self.callback_active = False
+
+    def resume_mission(self):
+        self.log("Resuming Missions.")
+        self.callback_active = True
+
+    def next_mission(self):
+        self.callback_active = False
+        if self.current_mission is not None:
+            self.log(f"Ending current mission: {self.current_mission}")
+            self.current_mission.end()
+        if len(self.mission_list) == 0:
+            self.log("No more missions to run.")
+            self.stop()
+            return
+        self.current_mission = self.mission_list.pop(0)
+        self.log(f"Starting next mission: {self.current_mission}")
+        self.perception.command_perception(self.current_mission.init_perc_cmd)
+        self.callback_active = True
+
+    def load_mission(self, mission: SimpleMission):
+        self.log(f"Added mission: {mission}")
+        self.mission_list.append(mission)
