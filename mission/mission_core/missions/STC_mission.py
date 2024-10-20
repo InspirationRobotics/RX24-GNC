@@ -34,7 +34,7 @@ class STCMission(Logger):
         self.stringAnalyzed = []
         self.max_value = 0
         self.light_pattern = "NNN"
-        self.countThreshold = 3
+        self.countThreshold = 5
         self.confidence_threshold = 0.5
         
     def __str__(self):
@@ -96,12 +96,15 @@ class STCMission(Logger):
 
         '''
         
+        perc_cmd = {}
+        gnc_cmd = {"poshold": True}
+
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
 
         if center_camera_results is None:
-            return {}, {}
+            return perc_cmd, gnc_cmd
         
         # Get the name of the highest confidence detection
         conf_list = []
@@ -113,19 +116,16 @@ class STCMission(Logger):
                 
                 # Append the class id, confidence, and bounding box coordinates to conf_list
                 conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
-                
-        self.log(f"Confidence list: {conf_list}")
-        
+                        
+        if len(conf_list) == 0:
+            return perc_cmd, gnc_cmd
+
         # Find the result with the highest confidence
         highest_confidence_result = max(conf_list, key=lambda x: x[1])
         
         # Extract the class ID, confidence, and bounding box coordinates
-        highest_confidence_name = highest_confidence_result[0]
-        highest_confidence_value = highest_confidence_result[1]
         bounding_box_coords = highest_confidence_result[2]
         
-        self.log(f"Detected: {highest_confidence_name} with confidence {highest_confidence_value}")
-
         x1, y1, x2, y2 = bounding_box_coords
         
         '''
@@ -143,44 +143,47 @@ class STCMission(Logger):
         '''
         
         # Crop to bounding box
-        cropped_image = center_camera_data.frame[y1:y2, x1:x2]
-
-        # Get the center 10% of the cropped image
+        cropped_image = center_camera_data.frame[int(y1):int(y2), int(x1):int(x2)]
+        
+        # Get the center 20% of the cropped image
         height, width, _ = cropped_image.shape
-        center_x1 = int(width * 0.45)
-        center_y1 = int(height * 0.45)
-        center_x2 = int(width * 0.55)
-        center_y2 = int(height * 0.55)
+        center_x1 = int(width * 0.40)
+        center_y1 = int(height * 0.40)
+        center_x2 = int(width * 0.60)
+        center_y2 = int(height * 0.60)
 
         cropped_center = cropped_image[center_y1:center_y2, center_x1:center_x2]
 
         # Apply Gaussian blur
-        blurred_image = cv2.GaussianBlur(cropped_center, (15, 15), 0)
+        blurred_image = cv2.GaussianBlur(cropped_center, (25, 25), 0)
+        blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
+
+        test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('Cropped Center', test_f)
+        if cv2.waitKey(4) & 0xFF == ord('q'):
+            gnc_cmd = {"end_mission": True}
+            return {}, gnc_cmd
 
         # Calculate the average color of the blurred image
         avg_color_per_row = np.mean(blurred_image, axis=0)
-        avg_color = np.mean(avg_color_per_row, axis=0)
+        avg_color = np.mean(avg_color_per_row, axis=0, dtype=np.int16)
         
         color_class = self.classify_color(avg_color)
-        print(f"Average color: {avg_color}, Classified color: {color_class}")
 
-        # Show the images
-        cv2.imshow('Cropped Center', cropped_center)
-        cv2.imshow('Blurred Image', blurred_image)
-
-
-        if len(conf_list) == 0:
-            return {}, {}
-        
-        self.storageArray.append(color_class)
+        if color_class in ["0","1","2","3"]:
+            self.log(f"Average color: {avg_color}, Classified color: {color_class}")
+            self.storageArray.append(color_class)
+        else:
+            self.log(color_class)
+            return perc_cmd, gnc_cmd
             
         if(len(self.storageArray) != 0):
-            self.log(f"Interim processing.  Current storage array: {self.storageArray}")
+            # self.log(f"Interim processing.  Current storage array: {self.storageArray}")
             returnVal = self.filter(self.storageArray)
             records = self.analyze(returnVal)
 
             self.colors, self.pattern = self.results(records)
-            self.log(f"Results: {self.colors[0]}, {self.colors[1]}, {self.colors[2]}")
+            # self.log(f"Results: {self.colors[0]}, {self.colors[1]}, {self.colors[2]}")
 
             
             max_vote = records.get(self.pattern)
@@ -192,8 +195,6 @@ class STCMission(Logger):
                 else:
                     self.light_pattern = ''.join(self.colors)
             
-        perc_cmd = {}
-        gnc_cmd = {"poshold": True}
         return perc_cmd, gnc_cmd
 
     def end(self):
@@ -202,10 +203,11 @@ class STCMission(Logger):
         This function is called when the run function returns end_mission = True 
         or when the mission handler decides to end the mission.
         '''
+        cv2.destroyAllWindows()
         pass
         
     
-    def analyze(self, stringAnalyzed, debug=False):
+    def analyze(self, stringAnalyzed):
         """Analyzes input string and adds votes to record
 
         Args:
@@ -220,7 +222,7 @@ class STCMission(Logger):
 
         val = "".join(stringAnalyzed)
         
-        self.log(f"Analysis started\nJoined: {val}")
+        # self.log(f"Analysis started\nJoined: {val}")
         
         # Everything is now combined and we want to split on black (0)
 
@@ -230,12 +232,9 @@ class STCMission(Logger):
         for i in splitVal:
             if i in records:
                 records[i] += 1
-            else:
-                if(debug):
-                    self.log(f"Ignoring invalid key: {i}")
         
             
-        self.log(f"Analysis ended.\nRecords: {records}")
+        # self.log(f"Analysis ended.\nRecords: {records}")
 
         return records
         
@@ -249,14 +248,14 @@ class STCMission(Logger):
         Returns:
             String: Raw compressed string of filtered detections
         """
-        self.log(f"Filtering started")
+        # self.log(f"Filtering started")
         stringAnalyzed = []
             
         analyzed = [key for key, _group in groupby(storageArray)]
         for i in analyzed:
             stringAnalyzed.append(str(i))
                             
-        self.log(f"Filtering complete. Analysis: {analyzed}")
+        # self.log(f"Filtering complete. Analysis: {analyzed}")
         return stringAnalyzed
     
     def results(self, records):
@@ -269,7 +268,7 @@ class STCMission(Logger):
             ([string, string, string], int): list of three colors and number of votes it received
         """
         
-        self.log(f"Logging dictionary at start of results. {records}")
+        # self.log(f"Logging dictionary at start of results. {records}")
 
         pattern_count = max(records, key=records.get)
         max_counter = records.get(pattern_count)
@@ -292,7 +291,7 @@ class STCMission(Logger):
     def classify_color(self, avg_color):
         b, g, r = avg_color  # OpenCV uses BGR format
 
-        if np.all(avg_color < 50):  # Check if the color is approximately black
+        if np.all(avg_color < 100):  # Check if the color is approximately black
             return "0"
         elif r > g and r > b and r > 100:
             return "3"
@@ -301,7 +300,7 @@ class STCMission(Logger):
         elif b > r and b > g and b > 100:
             return "1"
         else:
-            return "Error"
+            return f"Unknown Color: ({r}, {g}, {b})"
         
         
         # 0 is black
