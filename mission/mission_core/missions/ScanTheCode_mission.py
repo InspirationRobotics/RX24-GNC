@@ -30,8 +30,9 @@ class SimpleMission:
         self.storageArray = []
         self.stringAnalyzed = []
         self.max_value = 0
-        self.light_pattern = []
+        self.light_pattern = ["NNN"]
         self.countThreshold = 3
+        self.confidence_threshold = 0.5
         
     def __str__(self):
         return self.__class__.__name__
@@ -94,12 +95,22 @@ class SimpleMission:
         
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
-        if center_camera_data is not None:
-            # Something is detected
-            self.storageArray.append(center_camera_data.results[0].names)
+        center_camera_results = center_camera_data.results
+        
+        
+        if center_camera_results is None:
+            center_camera_results = self.get_latest_model_results()
+        for result in center_camera_results:
+            names = result.names
+            for box in result.boxes:
+                conf = box.conf.item()
+                if conf < self.confidence_threshold:
+                    continue
+                cls_id = box.cls.item()
+                self.storageArray.append(cls_id)
             
             if(len(self.storageArray) != 0):
-                self.log(f"Interim processing{self.storageArray}")
+                self.log(f"Interim processing.  Current storage array: {self.storageArray}")
                 returnVal = filter(self.storageArray)
                 records = self.analyze(returnVal)
 
@@ -118,7 +129,7 @@ class SimpleMission:
                 
                 else:
                     # No Colors to update, can just say black
-                    self.light_pattern = ["N", "N", "N"]
+                    self.light_pattern = "NNN"
             
         perc_cmd = {}
         gnc_cmd = {"poshold": True}
@@ -197,19 +208,18 @@ class SimpleMission:
             ([string, string, string], int): list of three colors and number of votes it received
         """
         
-        self.log("fLogging dictionary at start of results. {records}")
+        self.log(f"Logging dictionary at start of results. {records}")
 
         pattern_count = max(records, key=records.get)
         max_counter = records.get(pattern_count)
         
         if (max_counter):
             voteCount = records.get(pattern_count)
-            self.log(f"Determined pattern based on the voting scheme from records: {pattern_count}, With vote of: {voteCount}\n,
-                     {self.lookup[int(pattern_count[0])]},{self.lookup[int(pattern_count[1])]},{self.lookup[int(pattern_count[2])]},
-                     Individual colors: {color1}, {color2}, {color3}")
             color1 = self.lookup[int(pattern_count[0])]
             color2 = self.lookup[int(pattern_count[1])]
             color3 = self.lookup[int(pattern_count[2])]
+            self.log(f"Determined pattern based on the voting scheme from records: {pattern_count}, With vote of: {voteCount}\n,
+                     Individual colors: {color1}, {color2}, {color3}")
 
         
             return [color1, color2, color3], pattern_count
