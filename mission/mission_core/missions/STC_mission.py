@@ -10,6 +10,8 @@ from comms_core import Logger
 from ..mission_node import PositionData
 from perception_core import CameraData, Results
 from itertools import groupby
+import cv2
+import numpy as np
 
 
 class STCMission(Logger):
@@ -107,9 +109,27 @@ class STCMission(Logger):
             for box in result.boxes:
                 conf = box.conf.item()
                 cls_id = box.cls.item()
-                conf_list.append((int(cls_id), conf))
+                x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
+                
+                # Append the class id, confidence, and bounding box coordinates to conf_list
+                conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
+                
+        self.log(f"Confidence list: {conf_list}")
+        
+        # Find the result with the highest confidence
+        highest_confidence_result = max(conf_list, key=lambda x: x[1])
+        
+        # Extract the class ID, confidence, and bounding box coordinates
+        highest_confidence_name = highest_confidence_result[0]
+        highest_confidence_value = highest_confidence_result[1]
+        bounding_box_coords = highest_confidence_result[2]
+        
+        self.log(f"Detected: {highest_confidence_name} with confidence {highest_confidence_value}")
 
+        x1, y1, x2, y2 = bounding_box_coords
+        
         '''
+        
         Assume model only gives you detection boxes with confidence > 0.5
         The coordinates of the box can be accessed like so:
             x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
@@ -121,15 +141,38 @@ class STCMission(Logger):
         Take the average of the all the pixels above the threshold to determine the color (so you dont get black pixels from stripping).
         You can identify the color by seeing the largest value in the RGB tuple.
         '''
+        
+        # Crop to bounding box
+        cropped_image = center_camera_data.frame[y1:y2, x1:x2]
+
+        # Get the center 10% of the cropped image
+        height, width, _ = cropped_image.shape
+        center_x1 = int(width * 0.45)
+        center_y1 = int(height * 0.45)
+        center_x2 = int(width * 0.55)
+        center_y2 = int(height * 0.55)
+
+        cropped_center = cropped_image[center_y1:center_y2, center_x1:center_x2]
+
+        # Apply Gaussian blur
+        blurred_image = cv2.GaussianBlur(cropped_center, (15, 15), 0)
+
+        # Calculate the average color of the blurred image
+        avg_color_per_row = np.mean(blurred_image, axis=0)
+        avg_color = np.mean(avg_color_per_row, axis=0)
+        
+        color_class = self.classify_color(avg_color)
+        print(f"Average color: {avg_color}, Classified color: {color_class}")
+
+        # Show the images
+        cv2.imshow('Cropped Center', cropped_center)
+        cv2.imshow('Blurred Image', blurred_image)
+
 
         if len(conf_list) == 0:
             return {}, {}
         
-        self.log(f"Confidence list: {conf_list}")
-        highest_confidence_name = max(conf_list, key=lambda x: x[1])[0]
-        self.log(f"Detected: {highest_confidence_name} with confidence {max(conf_list, key=lambda x: x[1])[1]}")
-
-        self.storageArray.append(highest_confidence_name)
+        self.storageArray.append(color_class)
             
         if(len(self.storageArray) != 0):
             self.log(f"Interim processing.  Current storage array: {self.storageArray}")
@@ -245,3 +288,23 @@ class STCMission(Logger):
         else:
             self.log(f"No pattern cound in results")
             return ["N", "N", "N"], 0
+        
+    def classify_color(self, avg_color):
+        b, g, r = avg_color  # OpenCV uses BGR format
+
+        if np.all(avg_color < 50):  # Check if the color is approximately black
+            return "0"
+        elif r > g and r > b and r > 100:
+            return "3"
+        elif g > r and g > b and g > 100:
+            return "2"
+        elif b > r and b > g and b > 100:
+            return "1"
+        else:
+            return "Error"
+        
+        
+        # 0 is black
+        # 1 is blue
+        # 2 is green
+        # 3 is red
