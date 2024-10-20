@@ -109,6 +109,19 @@ class STCMission(Logger):
                 cls_id = box.cls.item()
                 conf_list.append((int(cls_id), conf))
 
+        '''
+        Assume model only gives you detection boxes with confidence > 0.5
+        The coordinates of the box can be accessed like so:
+            x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
+        
+        Take the frame crop it using the coordinates.
+        Then blur the cropped image. Then crop to the inner 10% of the image (centered to the bounding box).
+        If all the pixels are below a certain threshold, then the box is a black box.
+        Otherwise, the box is a colored box.
+        Take the average of the all the pixels above the threshold to determine the color (so you dont get black pixels from stripping).
+        You can identify the color by seeing the largest value in the RGB tuple.
+        '''
+
         if len(conf_list) == 0:
             return {}, {}
         
