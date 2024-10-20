@@ -5,10 +5,6 @@ The variables and functions defined here must exist in all mission classes.
 Comments are provided to explain the purpose of each variable and function and can be removed.
 '''
 
-# For deugging
-import cv2
-# For deugging
-
 from typing import Dict, Tuple
 from comms_core import Logger
 from ..mission_node import PositionData
@@ -29,6 +25,7 @@ class STCMission(Logger):
     }
 
     def __init__(self):
+        super().__init__(str(self))
         self.records = {"123":0, "132":0, "213":0, "231":0, "312":0, "321":0 }
         self.lookup = {0:'N',1:'B',2:'G',3:'R'}
         self.storageArray = []
@@ -100,10 +97,6 @@ class STCMission(Logger):
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
-        
-        if center_camera_data.frame is not None: # Display the camera feed (FOR DEBUGGING ONLY)
-            cv2.imshow("Center Camera", center_camera_data.frame)
-            cv2.waitKey(1) & 0xFF
 
         if center_camera_results is None:
             return {}, {}
@@ -111,19 +104,23 @@ class STCMission(Logger):
         # Get the name of the highest confidence detection
         conf_list = []
         for result in center_camera_results:
-            names = result.names
             for box in result.boxes:
                 conf = box.conf.item()
                 cls_id = box.cls.item()
-                conf_list.append((names[cls_id], conf))
+                conf_list.append((int(cls_id), conf))
 
+        if len(conf_list) == 0:
+            return {}, {}
+        
+        self.log(f"Confidence list: {conf_list}")
         highest_confidence_name = max(conf_list, key=lambda x: x[1])[0]
+        self.log(f"Detected: {highest_confidence_name} with confidence {max(conf_list, key=lambda x: x[1])[1]}")
 
         self.storageArray.append(highest_confidence_name)
             
         if(len(self.storageArray) != 0):
             self.log(f"Interim processing.  Current storage array: {self.storageArray}")
-            returnVal = filter(self.storageArray)
+            returnVal = self.filter(self.storageArray)
             records = self.analyze(returnVal)
 
             self.colors, self.pattern = self.results(records)
@@ -149,7 +146,6 @@ class STCMission(Logger):
         This function is called when the run function returns end_mission = True 
         or when the mission handler decides to end the mission.
         '''
-        cv2.destroyAllWindows() # Destroy all windows (FOR DEBUGGING ONLY)
         pass
         
     
@@ -227,7 +223,7 @@ class STCMission(Logger):
             color1 = self.lookup[int(pattern_count[0])]
             color2 = self.lookup[int(pattern_count[1])]
             color3 = self.lookup[int(pattern_count[2])]
-            self.log(f"Determined pattern based on the voting scheme from records: {pattern_count}, With vote of: {voteCount}\n,
+            self.log(f"Determined pattern based on the voting scheme from records: {pattern_count}, With vote of: {voteCount}\n, \
                      Individual colors: {color1}, {color2}, {color3}")
 
         

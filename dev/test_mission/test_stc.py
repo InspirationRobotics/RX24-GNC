@@ -1,3 +1,6 @@
+import os
+os.environ['YOLO_VERBOSE'] = 'False'
+
 import cv2
 import time
 import numpy as np
