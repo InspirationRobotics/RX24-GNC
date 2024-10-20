@@ -30,7 +30,7 @@ class SimpleMission:
         self.storageArray = []
         self.stringAnalyzed = []
         self.max_value = 0
-        self.light_pattern = ["NNN"]
+        self.light_pattern = "NNN"
         self.countThreshold = 3
         self.confidence_threshold = 0.5
         
@@ -132,10 +132,6 @@ class SimpleMission:
                     gnc_cmd = {"end_mission": True}
                 else:
                     self.light_pattern = ''.join(self.colors)
-            
-            else:
-                # No Colors to update, can just say black
-                self.light_pattern = "NNN"
             
         perc_cmd = {}
         gnc_cmd = {"poshold": True}
