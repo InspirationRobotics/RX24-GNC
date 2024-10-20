@@ -96,40 +96,46 @@ class SimpleMission:
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
-        
+        confidences = {}
         
         if center_camera_results is None:
             center_camera_results = self.get_latest_model_results()
         for result in center_camera_results:
-            names = result.names
             for box in result.boxes:
                 conf = box.conf.item()
                 if conf < self.confidence_threshold:
                     continue
                 cls_id = box.cls.item()
-                self.storageArray.append(cls_id)
+                if cls_id not in confidences or conf > confidences[cls_id]:
+                    confidences[cls_id] = conf
+                    
+        highest_confidence_name = max(confidences, key=confidences.get)
+        highest_confidence_value = confidences[highest_confidence_name]
+                        
+                
+        self.storageArray.append(highest_confidence_name)
             
-            if(len(self.storageArray) != 0):
-                self.log(f"Interim processing.  Current storage array: {self.storageArray}")
-                returnVal = filter(self.storageArray)
-                records = self.analyze(returnVal)
+        if(len(self.storageArray) != 0):
+            self.log(f"Interim processing.  Current storage array: {self.storageArray}")
+            returnVal = filter(self.storageArray)
+            records = self.analyze(returnVal)
 
-                self.colors, self.pattern = self.results(records)
-                self.log(f"Results: {self.colors[0]}, {self.colors[1]}, {self.colors[2]}")
+            self.colors, self.pattern = self.results(records)
+            self.log(f"Results: {self.colors[0]}, {self.colors[1]}, {self.colors[2]}")
 
-                
-                max_vote = records.get(self.pattern)
-                if max_vote is None:
-                    max_vote = 0
-                if(max_vote > 0):
-                    if(max_vote >= self.countThreshold):
-                        gnc_cmd = {"end_mission": True}
-                    else:
-                        self.light_pattern = ''.join(self.colors)
-                
+            
+            max_vote = records.get(self.pattern)
+            if max_vote is None:
+                max_vote = 0
+            if(max_vote > 0):
+                if(max_vote >= self.countThreshold):
+                    gnc_cmd = {"end_mission": True}
                 else:
-                    # No Colors to update, can just say black
-                    self.light_pattern = "NNN"
+                    self.light_pattern = ''.join(self.colors)
+            
+            else:
+                # No Colors to update, can just say black
+                self.light_pattern = "NNN"
             
         perc_cmd = {}
         gnc_cmd = {"poshold": True}
