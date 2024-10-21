@@ -63,14 +63,17 @@ class MissionHandler(Logger):
 
         self.active = False
 
-        self.callback_thread = Thread(target=self.__callback_loop)
+        self.callback_thread = Thread(target=self.__callback_loop, daemon=True)
         self.callback_active = False
 
-        self.send_thread = Thread(target=self.__send_loop)
+        self.send_thread = Thread(target=self.__send_loop, daemon=True)
         self.send_lock = Lock()
         self.to_send = {}
 
-        self.ground_station_thread = Thread(target=self._send_gs_heartbeat)
+        self.trigger_next = False
+        self.trigger_next_thread = Thread(target=self._trigger_next_mission, daemon=True)
+
+        self.ground_station_thread = Thread(target=self._send_gs_heartbeat, daemon=True)
         self.ground_station_ip = "192.168.3.20"
         self.system_heartbeat : SystemHeartbeat = None
         self.mission_heartbeat : MissionHeartbeat = None
@@ -79,6 +82,13 @@ class MissionHandler(Logger):
         
         self.log("Mission Handler Initialized.")
         self.start()
+
+    def _trigger_next_mission(self):
+        while self.active:
+            if self.trigger_next:
+                self.trigger_next = False
+                self.next_mission()
+            time.sleep(0.5)
 
     def _send_gs_heartbeat(self):
         while self.active:
@@ -127,7 +137,8 @@ class MissionHandler(Logger):
                 with self.gs_lock:
                     self.mission_heartbeat = MissionHeartbeat(self.current_mission.mission_heartbeat())
                 if end_mission:
-                    self.next_mission()
+                    self.trigger_next = True
+                    break
                 time.sleep(1/20)
             time.sleep(0.5)
 
@@ -147,6 +158,7 @@ class MissionHandler(Logger):
         self.active = True
         self.server.start()
         self.mission_node.start()
+        self.trigger_next_thread.start()
         self.callback_thread.start()
         self.send_thread.start()
 
