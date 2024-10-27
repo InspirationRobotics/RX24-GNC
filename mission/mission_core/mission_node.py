@@ -81,9 +81,9 @@ class MissionNode(Node):
             return
         msg = LatLonHead()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.latitude = data.lat
-        msg.longitude = data.lon
-        msg.heading = data.heading
+        msg.latitude = float(data.lat)
+        msg.longitude = float(data.lon)
+        msg.heading = float(data.heading)
         self.latlonhead_pub.publish(msg)
 
     def stop(self):

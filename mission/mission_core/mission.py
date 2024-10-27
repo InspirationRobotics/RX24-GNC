@@ -78,7 +78,6 @@ class MissionHandler(Logger):
         self.system_heartbeat : SystemHeartbeat = None
         self.mission_heartbeat : MissionHeartbeat = None
         self.gs_lock = Lock()
-        self.ground_station_thread.start()
         
         self.log("Mission Handler Initialized.")
         self.start()
@@ -95,9 +94,11 @@ class MissionHandler(Logger):
             with self.gs_lock:
                 heartbeats = {}
                 if self.system_heartbeat is not None:
-                    heartbeats["system"] = self.system_heartbeat
+                    if self.system_heartbeat.is_valid:
+                        heartbeats["system"] = self.system_heartbeat
                 if self.mission_heartbeat is not None:
-                    heartbeats["mission"] = self.mission_heartbeat
+                    if self.mission_heartbeat.is_valid:
+                        heartbeats["mission"] = self.mission_heartbeat
                 if len(heartbeats) > 0:
                     self.server.send(csm.encode(heartbeats), addr=self.ground_station_ip)
             time.sleep(0.5)
@@ -157,6 +158,7 @@ class MissionHandler(Logger):
         self.log("Starting Mission Handler.")
         self.active = True
         self.server.start()
+        self.ground_station_thread.start()
         self.mission_node.start()
         self.trigger_next_thread.start()
         self.callback_thread.start()
@@ -165,9 +167,10 @@ class MissionHandler(Logger):
     def stop(self):
         self.log("Stopping Mission Handler.")
         self.active = False
-        self.callback_thread.join()
-        self.send_thread.join()
+        self.callback_thread.join(2)
+        self.send_thread.join(2)
         self.mission_node.stop()
+        self.ground_station_thread.join(2)
         self.server.stop()
         rclpy.shutdown()
 

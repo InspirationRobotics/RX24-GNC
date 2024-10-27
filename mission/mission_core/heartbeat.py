@@ -11,6 +11,8 @@ class Heartbeat:
         self.team_id = team_id
         # Status
         self.status = []
+        # Validity
+        self.is_valid = True
 
     def __str__(self):
         return self._generate_msg()
@@ -31,7 +33,7 @@ class Heartbeat:
         '''
         msg = f"{self.msg_id},{self.EST_date},{self.EST_time},"
         for name, val in self.__dict__.items():
-            if name not in ["msg_id", "EST_date", "EST_time", "team_id", "status"]:
+            if name not in ["msg_id", "EST_date", "EST_time", "team_id", "status", "is_valid"]:
                 msg += f"{val},"
         msg += f"{self.team_id},"
         for val in self.status:
@@ -48,6 +50,9 @@ class Heartbeat:
 
 class SystemHeartbeat(Heartbeat):
     def __init__(self, position : tuple, mode : str, team_id : str = "INSPX"):
+        if position is None:
+            self.is_valid = False
+            return
         super().__init__("RXHRB", team_id)
         # Location Stuff
         self.lat = str(abs(position[0]))
@@ -62,8 +67,12 @@ class SystemHeartbeat(Heartbeat):
 
 class MissionHeartbeat(Heartbeat):
     def __init__(self, mission_state : list, team_id : str = "INSPX"):
+        if len(mission_state) < 1:
+            self.is_valid = False
+            return
         super().__init__(mission_state[0], team_id)
         self.status = mission_state[1:]
+        self.is_valid = True
 
 
 if __name__ == "__main__":
