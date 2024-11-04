@@ -19,11 +19,11 @@ class STCMission(Logger):
     # Define the initial perception commands here (if any)
     # This dictionary must exist, but some commands are entered as examples
     init_perc_cmd = {
-        "start": ["center"],
-        "stop": ["port", "starboard"],
+        "start": ["center", "starboard"],
+        "stop": ["port"],
         # "record": ["center"],
-        "stop_record": ["port", "starboard"],
-        "load_model": [("center", "stcA.pt")],
+        # "stop_record": ["port", "starboard"],
+        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt")],
     }
 
     def __init__(self):
@@ -34,7 +34,7 @@ class STCMission(Logger):
         self.stringAnalyzed = []
         self.max_value = 0
         self.light_pattern = "NNN"
-        self.countThreshold = 5
+        self.countThreshold = 2
         self.confidence_threshold = 0.5
         
     def __str__(self):
@@ -100,7 +100,7 @@ class STCMission(Logger):
         gnc_cmd = {"poshold": True}
 
         # Run one yolo inference on the provided frame at camera_data.frame
-        center_camera_data = camera_data.get("center")
+        center_camera_data = camera_data.get("starboard")
         center_camera_results = center_camera_data.results
 
         if center_camera_results is None:
@@ -158,11 +158,11 @@ class STCMission(Logger):
         blurred_image = cv2.GaussianBlur(cropped_center, (25, 25), 0)
         blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
 
-        # test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
-        # cv2.imshow('Cropped Center', test_f)
-        # if cv2.waitKey(4) & 0xFF == ord('q'):
-        #     gnc_cmd = {"end_mission": True}
-        #     return {}, gnc_cmd
+        test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('Cropped Center', test_f)
+        if cv2.waitKey(4) & 0xFF == ord('q'):
+            gnc_cmd = {"end_mission": True}
+            return {}, gnc_cmd
 
         # Calculate the average color of the blurred image
         avg_color_per_row = np.mean(blurred_image, axis=0)
