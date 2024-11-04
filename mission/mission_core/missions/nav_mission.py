@@ -6,6 +6,7 @@ Comments are provided to explain the purpose of each variable and function and c
 '''
 
 from typing import Dict, Tuple
+
 from comms_core import Logger
 from ..mission_node import PositionData
 from perception_core import CameraData, Results
@@ -22,6 +23,7 @@ class NavMission(Logger):
 
     def __init__(self):
         super().__init__(str(self))
+        self.count = 0
         pass
 
     def __str__(self):
@@ -67,11 +69,14 @@ class NavMission(Logger):
             or just self.log("hi there") or self.log(variable)
 
         '''
-        
-        
-        target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 30)
         perc_cmd = {}
-        gnc_cmd = {"waypoint":target_waypoint}
+        gnc_cmd = {}
+        if self.count < 2:
+            # This is to ensure we dont keep recalculating a different waypoint as we move
+            target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 30)
+            gnc_cmd["waypoint"] = target_waypoint
+            self.count += 1
+
         return perc_cmd, gnc_cmd
 
     def end(self):
