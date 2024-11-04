@@ -71,11 +71,12 @@ class NavMission(Logger):
         '''
         perc_cmd = {}
         gnc_cmd = {}
-        if self.count < 2:
-            # This is to ensure we dont keep recalculating a different waypoint as we move
-            target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 30)
-            gnc_cmd["waypoint"] = target_waypoint
-            self.count += 1
+        if self.count < 2 and position_data is not None:
+            if position_data.heading is not None and position_data.position is not None:
+                # This is to ensure we dont keep recalculating a different waypoint as we move
+                target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 50)
+                gnc_cmd["waypoint"] = target_waypoint
+                self.count += 1
 
         return perc_cmd, gnc_cmd
 
