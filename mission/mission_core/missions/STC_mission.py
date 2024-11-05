@@ -19,11 +19,10 @@ class STCMission(Logger):
     # Define the initial perception commands here (if any)
     # This dictionary must exist, but some commands are entered as examples
     init_perc_cmd = {
-        "start": ["center", "starboard"],
-        "stop": ["port"],
+        "start": ["center", "starboard", "port"],
         # "record": ["center"],
         # "stop_record": ["port", "starboard"],
-        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt")],
+        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt"), ("center", "stcA.pt"),],
     }
 
     def __init__(self):
@@ -100,82 +99,32 @@ class STCMission(Logger):
         gnc_cmd = {"poshold": True}
 
         # Run one yolo inference on the provided frame at camera_data.frame
-        center_camera_data = camera_data.get("starboard")
+        center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
+        
+        port_camera_data = camera_data.get("port")
+        port_camera_results = port_camera_data.results
 
-        if center_camera_results is None:
+        starboard_camera_data = camera_data.get("starboard")
+        starboard_camera_results = starboard_camera_data.results
+
+        if center_camera_results is None or port_camera_results is None or starboard_camera_results is None:
             return perc_cmd, gnc_cmd
         
-        # Get the name of the highest confidence detection
-        conf_list = []
-        for result in center_camera_results:
-            for box in result.boxes:
-                conf = box.conf.item()
-                cls_id = box.cls.item()
-                x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
-                
-                # Append the class id, confidence, and bounding box coordinates to conf_list
-                conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
-                        
-        if len(conf_list) == 0:
-            return perc_cmd, gnc_cmd
-
-        # Find the result with the highest confidence
-        highest_confidence_result = max(conf_list, key=lambda x: x[1])
+        res1 = self.image_process(center_camera_data, center_camera_results) #None if error, false if end mission, other wise 0 to 3 number
+        res2 = self.image_process(port_camera_data, port_camera_results)
+        res3 = self.image_process(starboard_camera_data, starboard_camera_results)
         
-        # Extract the class ID, confidence, and bounding box coordinates
-        bounding_box_coords = highest_confidence_result[2]
+        results = []
+        results.append(res1, res2, res3)
         
-        x1, y1, x2, y2 = bounding_box_coords
-        
-        '''
-        
-        Assume model only gives you detection boxes with confidence > 0.5
-        The coordinates of the box can be accessed like so:
-            x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
-        
-        Take the frame crop it using the coordinates.
-        Then blur the cropped image. Then crop to the inner 10% of the image (centered to the bounding box).
-        If all the pixels are below a certain threshold, then the box is a black box.
-        Otherwise, the box is a colored box.
-        Take the average of the all the pixels above the threshold to determine the color (so you dont get black pixels from stripping).
-        You can identify the color by seeing the largest value in the RGB tuple.
-        '''
-        
-        # Crop to bounding box
-        cropped_image = center_camera_data.frame[int(y1):int(y2), int(x1):int(x2)]
-        
-        # Get the center 20% of the cropped image
-        height, width, _ = cropped_image.shape
-        center_x1 = int(width * 0.40)
-        center_y1 = int(height * 0.40)
-        center_x2 = int(width * 0.60)
-        center_y2 = int(height * 0.60)
-
-        cropped_center = cropped_image[center_y1:center_y2, center_x1:center_x2]
-
-        # Apply Gaussian blur
-        blurred_image = cv2.GaussianBlur(cropped_center, (25, 25), 0)
-        blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
-
-        test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow('Cropped Center', test_f)
-        if cv2.waitKey(4) & 0xFF == ord('q'):
-            gnc_cmd = {"end_mission": True}
-            return {}, gnc_cmd
-
-        # Calculate the average color of the blurred image
-        avg_color_per_row = np.mean(blurred_image, axis=0)
-        avg_color = np.mean(avg_color_per_row, axis=0, dtype=np.int16)
-        
-        color_class = self.classify_color(avg_color)
-
-        if color_class in ["0","1","2","3"]:
-            self.log(f"Average color: {avg_color}, Classified color: {color_class}")
-            self.storageArray.append(color_class)
-        else:
-            self.log(color_class)
-            return perc_cmd, gnc_cmd
+        for i in results:
+            if i == False:
+                # End mission
+                gnc_cmd = {"end_mission": True}
+                return perc_cmd, gnc_cmd
+            if i >= 0 and i <= 4:
+                self.storageArray.append(i)
             
         if(len(self.storageArray) != 0):
             self.log(f"Interim processing.  Current storage array: {self.storageArray}")
@@ -307,3 +256,82 @@ class STCMission(Logger):
         # 1 is blue
         # 2 is green
         # 3 is red
+        
+        
+        
+    def image_process(self, cdata, cresults):
+        
+        # Run one yolo inference on the provided frame at camera_data.frame
+        center_camera_data = cdata
+        center_camera_results = cresults
+        
+        # Get the name of the highest confidence detection
+        conf_list = []
+        for result in center_camera_results:
+            for box in result.boxes:
+                conf = box.conf.item()
+                cls_id = box.cls.item()
+                x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
+                
+                # Append the class id, confidence, and bounding box coordinates to conf_list
+                conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
+                        
+        if len(conf_list) == 0:
+            return None
+
+        # Find the result with the highest confidence
+        highest_confidence_result = max(conf_list, key=lambda x: x[1])
+        
+        # Extract the class ID, confidence, and bounding box coordinates
+        bounding_box_coords = highest_confidence_result[2]
+        
+        x1, y1, x2, y2 = bounding_box_coords
+        
+        '''
+        
+        Assume model only gives you detection boxes with confidence > 0.5
+        The coordinates of the box can be accessed like so:
+            x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
+        
+        Take the frame crop it using the coordinates.
+        Then blur the cropped image. Then crop to the inner 10% of the image (centered to the bounding box).
+        If all the pixels are below a certain threshold, then the box is a black box.
+        Otherwise, the box is a colored box.
+        Take the average of the all the pixels above the threshold to determine the color (so you dont get black pixels from stripping).
+        You can identify the color by seeing the largest value in the RGB tuple.
+        '''
+        
+        # Crop to bounding box
+        cropped_image = center_camera_data.frame[int(y1):int(y2), int(x1):int(x2)]
+        
+        # Get the center 20% of the cropped image
+        height, width, _ = cropped_image.shape
+        center_x1 = int(width * 0.40)
+        center_y1 = int(height * 0.40)
+        center_x2 = int(width * 0.60)
+        center_y2 = int(height * 0.60)
+
+        cropped_center = cropped_image[center_y1:center_y2, center_x1:center_x2]
+
+        # Apply Gaussian blur
+        blurred_image = cv2.GaussianBlur(cropped_center, (25, 25), 0)
+        blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
+
+        test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow('Cropped Center', test_f)
+        if cv2.waitKey(4) & 0xFF == ord('q'):
+            gnc_cmd = {"end_mission": True}
+            return False
+
+        # Calculate the average color of the blurred image
+        avg_color_per_row = np.mean(blurred_image, axis=0)
+        avg_color = np.mean(avg_color_per_row, axis=0, dtype=np.int16)
+        
+        color_class = self.classify_color(avg_color)
+
+        if color_class in ["0","1","2","3"]:
+            self.log(f"Average color: {avg_color}, Classified color: {color_class}")
+            return color_class
+        else:
+            self.log(color_class)
+            return None
