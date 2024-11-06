@@ -74,7 +74,7 @@ class NavMission(Logger):
         if self.count < 2 and position_data is not None:
             if position_data.heading is not None and position_data.position is not None:
                 # This is to ensure we dont keep recalculating a different waypoint as we move
-                target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 50)
+                target_waypoint = self.destination_point(position_data.lat, position_data.lon, position_data.heading, 40)
                 gnc_cmd["waypoint"] = target_waypoint
                 self.count += 1
 

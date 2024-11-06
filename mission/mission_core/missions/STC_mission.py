@@ -22,7 +22,7 @@ class STCMission(Logger):
         "start": ["center", "starboard", "port"],
         # "record": ["center"],
         # "stop_record": ["port", "starboard"],
-        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt"), ("center", "stcA.pt"),],
+        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt"), ("port", "stcA.pt")]
     }
 
     def __init__(self):
@@ -96,7 +96,8 @@ class STCMission(Logger):
         '''
         
         perc_cmd = {}
-        gnc_cmd = {"poshold": True}
+        gnc_cmd = {}
+        # gnc_cmd = {"poshold": True}
 
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
@@ -111,19 +112,21 @@ class STCMission(Logger):
         if center_camera_results is None or port_camera_results is None or starboard_camera_results is None:
             return perc_cmd, gnc_cmd
         
-        res1 = self.image_process(center_camera_data, center_camera_results) #None if error, false if end mission, other wise 0 to 3 number
-        res2 = self.image_process(port_camera_data, port_camera_results)
-        res3 = self.image_process(starboard_camera_data, starboard_camera_results)
+        res1 = self.image_process(center_camera_data, center_camera_results, "center") #None if error, false if end mission, other wise 0 to 3 number
+        res2 = self.image_process(port_camera_data, port_camera_results, "port")
+        res3 = self.image_process(starboard_camera_data, starboard_camera_results, "starboard")
         
         results = []
-        results.append(res1, res2, res3)
+        results.extend([res1, res2, res3])
         
         for i in results:
+            if i == None:
+                return perc_cmd, gnc_cmd
             if i == False:
                 # End mission
                 gnc_cmd = {"end_mission": True}
                 return perc_cmd, gnc_cmd
-            if i >= 0 and i <= 4:
+            if i in ["0","1","2","3"]:
                 self.storageArray.append(i)
             
         if(len(self.storageArray) != 0):
@@ -259,7 +262,7 @@ class STCMission(Logger):
         
         
         
-    def image_process(self, cdata, cresults):
+    def image_process(self, cdata, cresults, name):
         
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = cdata
@@ -318,7 +321,7 @@ class STCMission(Logger):
         blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
 
         test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow('Cropped Center', test_f)
+        cv2.imshow(name, test_f)
         if cv2.waitKey(4) & 0xFF == ord('q'):
             gnc_cmd = {"end_mission": True}
             return False
