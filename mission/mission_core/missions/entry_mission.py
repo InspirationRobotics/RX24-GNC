@@ -4,7 +4,7 @@ A simple mission template for creating new missions.
 The variables and functions defined here must exist in all mission classes.
 Comments are provided to explain the purpose of each variable and function and can be removed.
 '''
-
+import cv2
 from typing import Dict, Tuple
 import random
 from comms_core import Logger
@@ -25,6 +25,8 @@ class EntryMission(Logger):
 
     def __init__(self):
         super().__init__(str(self))
+        # cv2.namedWindow("view", cv2.WINDOW_NORMAL)
+        # cv2.resizeWindow("view", 640, 480)
         pass
 
     def __str__(self):
@@ -99,7 +101,13 @@ class EntryMission(Logger):
         center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
         if center_camera_results is not None:
-            frame_width, frame_height = center_camera_data.frame.shape[1], center_camera_data.frame.shape[0]
+            if center_camera_data.frame is not None:
+                frame_width, frame_height = center_camera_data.frame.shape[1], center_camera_data.frame.shape[0]
+                # cv2.imshow("view", center_camera_data.frame)
+                # if cv2.waitKey(2) & 0xFF == ord('q'):
+                #     pass
+            else:
+                return {}, {}
             conf_list = []
             for result in center_camera_results:
                 for box in result.boxes:
@@ -128,8 +136,8 @@ class EntryMission(Logger):
         # So to test:
         if position_data is not None:
             if position_data.heading is not None:
-                target_heading = position_data.heading + 5
-                target_vector = [0,0.6] # Move forward at 0.5 speed
+                target_heading = position_data.heading - 10
+                target_vector = [0,0.5] # Move forward at 0.5 speed
                 gnc_cmd["heading"] = target_heading
                 gnc_cmd["vector"] = target_vector
 
