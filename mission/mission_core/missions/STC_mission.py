@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 
 
+# New data.yaml is as following : names: ['1red', '2green', '3blue', '4black', '5platform']
+
 class STCMission(Logger):
 
     # Define the initial perception commands here (if any)
