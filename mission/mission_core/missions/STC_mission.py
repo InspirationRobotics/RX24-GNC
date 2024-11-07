@@ -13,7 +13,6 @@ from itertools import groupby
 import cv2
 import numpy as np
 
-
 class STCMission(Logger):
 
     # Define the initial perception commands here (if any)
@@ -135,8 +134,6 @@ class STCMission(Logger):
             records = self.analyze(returnVal)
 
             self.colors, self.pattern = self.results(records)
-            # self.log(f"Results: {self.colors[0]}, {self.colors[1]}, {self.colors[2]}")
-
             
             max_vote = records.get(self.pattern)
             if max_vote is None:
@@ -283,12 +280,17 @@ class STCMission(Logger):
             return None
 
         # Find the result with the highest confidence
-        highest_confidence_result = max(conf_list, key=lambda x: x[1])
+        confs = sorted(conf_list, key=lambda x: x[1], reverse=True)
         
         # Extract the class ID, confidence, and bounding box coordinates
-        bounding_box_coords = highest_confidence_result[2]
-        
-        x1, y1, x2, y2 = bounding_box_coords
+        # Find the first class id that is not 4 (which is the platform class)
+        x1 = None
+        for cls_id, conf, bounding_box_coords in confs:
+            if cls_id != 4:
+                x1, y1, x2, y2 = bounding_box_coords
+                break
+        if x1 is None:
+            return None
         
         '''
         
