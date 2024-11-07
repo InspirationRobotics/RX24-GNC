@@ -138,9 +138,14 @@ class EntryMission(Logger):
         port_camera_data = camera_data.get("port")
         starboard_camera_data = camera_data.get("starboard")
 
-        center_tower_location = self.process_tower_location(center_camera_data)
-        port_tower_location = self.process_tower_location(port_camera_data)
-        starboard_tower_location = self.process_tower_location(starboard_camera_data)
+        center_tower_location = self.process_tower_location("center", center_camera_data)
+        if center_camera_data is not None:
+            if center_camera_data.frame is not None and self.debug_mode:
+                cv2.imshow("view", center_camera_data.frame)
+                if cv2.waitKey(2) & 0xFF == ord('q'):
+                    pass
+        port_tower_location = self.process_tower_location("port", port_camera_data)
+        starboard_tower_location = self.process_tower_location("starboard", starboard_camera_data)
 
         # If any camera sees a color, add to the count
         if center_tower_location is True or port_tower_location is True or starboard_tower_location is True:
@@ -155,35 +160,38 @@ class EntryMission(Logger):
             }
             return perc_cmd, gnc_cmd
 
+        gnc_cmd["heading"] = position_data.heading - 3
         # If the center camera sees the platform, head towards it
         if center_tower_location is not None:
             ratio, conf = center_tower_location
-            if abs(ratio) < 0.2:
+            if abs(ratio) < 0.1:
                 gnc_cmd["vector"] = [0,0.5]
                 gnc_cmd["heading"] = position_data.heading
             elif ratio < 0:
-                gnc_cmd["heading"] = position_data.heading + 6
-            elif ratio > 0:
                 gnc_cmd["heading"] = position_data.heading - 6
+            elif ratio > 0:
+                gnc_cmd["heading"] = position_data.heading + 6
             return perc_cmd, gnc_cmd
         
         # If the port camera sees the platform, yaw to the left
         if port_tower_location is not None:
             ratio, conf = port_tower_location
-            gnc_cmd["heading"] = position_data.heading - 10
+            gnc_cmd["vector"] = [0,0.2]
+            gnc_cmd["heading"] = position_data.heading - 15
             return perc_cmd, gnc_cmd
         
         # If the starboard camera sees the platform, yaw to the right
         if starboard_tower_location is not None:
             ratio, conf = starboard_tower_location
-            gnc_cmd["heading"] = position_data.heading + 10
+            gnc_cmd["vector"] = [0,0.2]
+            gnc_cmd["heading"] = position_data.heading + 15
             return perc_cmd, gnc_cmd
 
         perc_cmd = {}
         gnc_cmd = {}
         return perc_cmd, gnc_cmd
 
-    def process_tower_location(self, camera_data: CameraData) -> Tuple[float, float] | None | bool:
+    def process_tower_location(self, name, camera_data: CameraData) -> Tuple[float, float] | None | bool:
         '''
         This function processes the tower location from the camera data.
         It returns the tower location in the form of a tuple (ratio, conf) where ratio is the distance of the tower
@@ -211,15 +219,19 @@ class EntryMission(Logger):
                     conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
                         
         if len(conf_list) != 0:
-            # If a color is detected, return True
-            if any([cls_id in [0, 1, 2, 3] for cls_id, conf, _ in conf_list]):
-                return True
+            # If a color and platform is detected, return True
+            for cls_id, conf, _ in conf_list:
+                if cls_id in [0,1,2,3] and conf > 0.6:
+                    if any([cls_id == 4 for cls_id, conf, _ in conf_list]):
+                        self.warning("Color and platform detected")
+                        return True and name == "center"
             # If a tower is detected, return the tower location
             for conf in conf_list:
                 if conf[0] == 4:
                     x1, y1, x2, y2 = conf[2]
                     x = (x1 + x2) / 2
                     ratio = (x / frame_width) - 0.5
+                    self.warning(f"{name}: Tower detected {ratio}, {conf[1]}")
                     return ratio, conf[1]
         # No detections
         return None

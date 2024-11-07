@@ -1,7 +1,10 @@
 import time
+import operator
+from functools import reduce
+
 
 class Heartbeat:
-    def __init__(self, msg_id : str, team_id : str = "INSPX"):
+    def __init__(self, msg_id : str, team_id : str = "INSP"):
         self.msg_id = msg_id
         # Time Stuff
         timestamp = time.time()
@@ -40,33 +43,37 @@ class Heartbeat:
             msg += f"{val},"
         # Remove the last comma
         msg = msg[:-1]
-        checksum = 0
-        for char in msg:
-            checksum ^= ord(char)
-        checksum = hex(checksum)[2:]
+        sum = hex(reduce((operator.xor), map(ord, msg), 0))[2:].upper()
+        if len(sum) == 2:
+            checksum = sum
+        else:
+            checksum = "0" + sum
         msg += f"*{checksum}\r\n"
         return f"${msg}"
 
 
 class SystemHeartbeat(Heartbeat):
-    def __init__(self, position : tuple, mode : str, team_id : str = "INSPX"):
+    def __init__(self, position : tuple, mode : str, team_id : str = "INSP"):
         if position is None:
             self.is_valid = False
             return
         super().__init__("RXHRB", team_id)
         # Location Stuff
-        self.lat = str(abs(position[0]))
-        self.lat_dir = "N" if position[0] >= 0 else "S"
-        self.lon = str(abs(position[1]))
-        self.lon_dir = "E" if position[1] >= 0 else "W"
-        # Mode (1 is tele, 2 is auto, 3 is killed)
-        mode = mode
-        # UAV status
-        uav_status = "1" # we are not using UAV
-        self.status = [mode, uav_status]
+        try:
+            self.lat = str(abs(position[0]))
+            self.lat_dir = "N" if position[0] >= 0 else "S"
+            self.lon = str(abs(position[1]))
+            self.lon_dir = "E" if position[1] >= 0 else "W"
+            # Mode (1 is tele, 2 is auto, 3 is killed)
+            mode = mode
+            # UAV status
+            uav_status = "1" # we are not using UAV
+            self.status = [mode, uav_status]
+        except:
+            self.is_valid = False
 
 class MissionHeartbeat(Heartbeat):
-    def __init__(self, mission_state : list, team_id : str = "INSPX"):
+    def __init__(self, mission_state : list, team_id : str = "INSP"):
         if len(mission_state) < 1:
             self.is_valid = False
             return
@@ -78,5 +85,5 @@ class MissionHeartbeat(Heartbeat):
 if __name__ == "__main__":
     hb = SystemHeartbeat((42.0, -71.0), "1")
     print(hb)
-    hb2 = MissionHeartbeat(["RXCOD", "RBG"])
-    print(hb2)
+    # hb2 = MissionHeartbeat(["RXCOD", "RBG"])
+    # print(hb2)

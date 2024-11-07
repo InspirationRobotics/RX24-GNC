@@ -21,10 +21,10 @@ class STCMission(Logger):
         "start": ["center", "starboard", "port"],
         # "record": ["center"],
         # "stop_record": ["port", "starboard"],
-        "load_model": [("center", "stcC.pt"), ("starboard", "stcC.pt"), ("port", "stcC.pt")]
+        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt"), ("port", "stcA.pt")]
     }
 
-    def __init__(self):
+    def __init__(self, debug_mode=False):
         super().__init__(str(self))
         self.records = {"123":0, "132":0, "213":0, "231":0, "312":0, "321":0 }
         self.lookup = {0:'N',1:'B',2:'G',3:'R'}
@@ -34,6 +34,7 @@ class STCMission(Logger):
         self.light_pattern = "NNN"
         self.countThreshold = 2
         self.confidence_threshold = 0.5
+        self.debug_mode = debug_mode
         
     def __str__(self):
         return self.__class__.__name__
@@ -140,6 +141,7 @@ class STCMission(Logger):
                 max_vote = 0
             if(max_vote > 0):
                 if(max_vote >= self.countThreshold):
+                    self.warning(f"Found final lightpattern of: {self.light_pattern}")
                     gnc_cmd = {"end_mission": True}
                 else:
                     self.light_pattern = ''.join(self.colors)
@@ -322,11 +324,12 @@ class STCMission(Logger):
         blurred_image = cv2.GaussianBlur(cropped_center, (25, 25), 0)
         blurred_image = cv2.GaussianBlur(blurred_image, (25, 25), 0)
 
-        test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow(name, test_f)
-        if cv2.waitKey(4) & 0xFF == ord('q'):
-            gnc_cmd = {"end_mission": True}
-            return False
+        if self.debug_mode:
+            test_f = cv2.resize(blurred_image, (200,200), interpolation=cv2.INTER_NEAREST)
+            cv2.imshow(name, test_f)
+            if cv2.waitKey(4) & 0xFF == ord('q'):
+                gnc_cmd = {"end_mission": True}
+                return False
 
         # Calculate the average color of the blurred image
         avg_color_per_row = np.mean(blurred_image, axis=0)

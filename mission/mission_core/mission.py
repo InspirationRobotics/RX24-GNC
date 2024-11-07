@@ -74,7 +74,7 @@ class MissionHandler(Logger):
         self.trigger_next_thread = Thread(target=self._trigger_next_mission, daemon=True)
 
         self.ground_station_thread = Thread(target=self._send_gs_heartbeat, daemon=True)
-        self.ground_station_ip = "192.168.3.20"
+        self.ground_station_ip = "192.168.3.104"
         self.system_heartbeat : SystemHeartbeat = None
         self.mission_heartbeat : MissionHeartbeat = None
         self.gs_lock = Lock()

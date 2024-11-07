@@ -75,16 +75,19 @@ class MissionNode(Node):
         print("Started mission node...")
 
     def send_gps(self, data: PositionData):
-        if data.position is None:
-            return
-        if data.heading is None:
-            return
-        msg = LatLonHead()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.latitude = float(data.lat)
-        msg.longitude = float(data.lon)
-        msg.heading = float(data.heading)
-        self.latlonhead_pub.publish(msg)
+        try:
+            if data.position is None:
+                return
+            if data.heading is None:
+                return
+            msg = LatLonHead()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.latitude = float(data.lat)
+            msg.longitude = float(data.lon)
+            msg.heading = float(data.heading)
+            self.latlonhead_pub.publish(msg)
+        except:
+            pass
 
     def stop(self):
         if not self.active:
