@@ -53,6 +53,7 @@ class EntryMission(Logger):
         if self.debug_mode:
             cv2.namedWindow("view", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("view", 640, 480)
+        self.at_target = False
 
     def __str__(self):
         return self.__class__.__name__
@@ -251,6 +252,23 @@ class EntryMission(Logger):
         lat2 = math.degrees(lat2)
         lon2 = math.degrees(lon2)
         return lat2, lon2
+    
+    def haversine(lat1, lon1, lat2, lon2) -> float:
+        """
+        Calculate the great circle distance between two points
+        on the earth (specified in decimal degrees)
+        Returns distance in meters
+        """
+        # convert decimal degrees to radians
+        lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
+
+        # haversine formula
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        r = 6371000 # Radius of earth in meters. Use 3956 for miles
+        return c * r
 
     def end(self):
         '''

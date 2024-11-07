@@ -150,27 +150,28 @@ class FTPMission(Logger):
         '''
         Based off the proposed location and current location return the forward speed and the yaw rate.
         '''
-        target_speed = 0
+        target_speed = 0.2
         yaw_rate = 0
         # If the buoy should be on the left side of the screen.
         if location == "L":
             if ratio < 0.05:
                 yaw_rate = 6
             elif ratio < 0.15:
-                target_speed = 0.3
+                target_speed = 0.4
             else:
                 yaw_rate = -6
         else:
             if ratio > 0.95:
                 yaw_rate = -6
             elif ratio > 0.85:
-                target_speed = 0.3
+                target_speed = 0.4
             else:
                 yaw_rate = 6
+        yaw_rate*=2
         if yaw_rate > 0:
-            self.warning(f"Yawing right at {yaw_rate}")
-        elif yaw_rate < 0:
             self.warning(f"Yawing left at {yaw_rate}")
+        elif yaw_rate < 0:
+            self.warning(f"Yawing right at {yaw_rate}")
         else:
             self.warning(f"Moving forward at {target_speed}")
         return target_speed, yaw_rate
