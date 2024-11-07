@@ -5,11 +5,34 @@ The variables and functions defined here must exist in all mission classes.
 Comments are provided to explain the purpose of each variable and function and can be removed.
 '''
 import cv2
-from typing import Dict, Tuple
+import math
 import random
+from typing import Dict, Tuple
 from comms_core import Logger
 from ..mission_node import PositionData
 from perception_core import CameraData, Results
+
+'''
+Entry logic:
+
+# If entrance model works:
+# - Run the entrance model on the center camera
+# - Mark the two buoys, and center to get through them
+#   - If one buoys is smaller than the other (ex left smaller than right then left is further)
+#   - So then strafe left and yaw to the right
+# - Once both buoys are out of frame, switch model to the platform model.
+
+# Otherwise:
+ - Go straight for a certain distance
+ - Use the stc model to detect the platform and head towards it
+ - Once we also get red/black/green/blue detections we can end mission and hand off to the next mission
+
+Use new STC model to find the STC platform.
+The model should run on all 3 cameras. If the center camera does not see the platform,
+and one of the side cameras do, then yaw in the direction of the camera that sees the platform.
+Head towards platform until its a certain size in the center camera.
+End mission
+'''
 
 
 class EntryMission(Logger):
@@ -18,16 +41,18 @@ class EntryMission(Logger):
     # This dictionary must exist, but some commands are entered as examples
     init_perc_cmd = {
         "start": ["center", "port", "starboard"],
-        "load_model": [("center", "stcA.pt")],
+        "load_model": [("center", "stcB.pt"), ("port", "stcB.pt"), ("starboard", "stcB.pt")],
         # "stop": ["port", "starboard"],
         # "record": ["center"],
     }
 
-    def __init__(self):
+    def __init__(self, debug_mode: bool = False):
         super().__init__(str(self))
-        # cv2.namedWindow("view", cv2.WINDOW_NORMAL)
-        # cv2.resizeWindow("view", 640, 480)
-        pass
+        self.debug_mode = debug_mode
+        self.color_count = 0
+        if self.debug_mode:
+            cv2.namedWindow("view", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("view", 640, 480)
 
     def __str__(self):
         return self.__class__.__name__
@@ -97,52 +122,123 @@ class EntryMission(Logger):
         # The logic for this mission is essentially to move forward toward the STC until the side cameras no longer see the buoys
         # This involves moving forward and yawing at the same time
         # The STC is the center camera
+        
+        perc_cmd = {}
+        gnc_cmd = {}
+
+        gnc_cmd["vector"] = [0, 0.3]
+
+        if position_data is None:
+            return perc_cmd, gnc_cmd
+        
+        if position_data.heading is None:
+            return perc_cmd, gnc_cmd
 
         center_camera_data = camera_data.get("center")
-        center_camera_results = center_camera_data.results
-        if center_camera_results is not None:
-            if center_camera_data.frame is not None:
-                frame_width, frame_height = center_camera_data.frame.shape[1], center_camera_data.frame.shape[0]
-                # cv2.imshow("view", center_camera_data.frame)
-                # if cv2.waitKey(2) & 0xFF == ord('q'):
-                #     pass
-            else:
-                return {}, {}
-            conf_list = []
-            for result in center_camera_results:
-                for box in result.boxes:
-                    conf = box.conf.item()
-                    cls_id = box.cls.item()
-                    x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
-                    
-                    # Append the class id, confidence, and bounding box coordinates to conf_list
-                    conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
-                            
-            if len(conf_list) != 0:
-                highest_confidence_result = max(conf_list, key=lambda x: x[1])
-                bounding_box_coords = highest_confidence_result[2]
-                x1, y1, x2, y2 = bounding_box_coords
-                center_coord = (x1 + x2) / 2, (y1 + y2) / 2
-                center_x, center_y = center_coord
-                center_x = center_x / frame_width
-                if center_x < 0.45:
-                    print("The STC is to the left")
-                elif center_x > 0.55:
-                    print("The STC is to the right")
-                else:
-                    print("The STC is centered")
+        port_camera_data = camera_data.get("port")
+        starboard_camera_data = camera_data.get("starboard")
+
+        center_tower_location = self.process_tower_location(center_camera_data)
+        port_tower_location = self.process_tower_location(port_camera_data)
+        starboard_tower_location = self.process_tower_location(starboard_camera_data)
+
+        # If any camera sees a color, add to the count
+        if center_tower_location is True or port_tower_location is True or starboard_tower_location is True:
+            self.color_count += 1
+            return perc_cmd, gnc_cmd
+
+        # 5 frames of color detection is enough to assume we are at the platform
+        if self.color_count >= 5:
+            gnc_cmd = {
+                "poshold": True,
+                "end_mission": True
+            }
+            return perc_cmd, gnc_cmd
+
+        # If the center camera sees the platform, head towards it
+        if center_tower_location is not None:
+            ratio, conf = center_tower_location
+            if abs(ratio) < 0.2:
+                gnc_cmd["vector"] = [0,0.5]
+                gnc_cmd["heading"] = position_data.heading
+            elif ratio < 0:
+                gnc_cmd["heading"] = position_data.heading + 6
+            elif ratio > 0:
+                gnc_cmd["heading"] = position_data.heading - 6
+            return perc_cmd, gnc_cmd
         
-        gnc_cmd = {}
-        # So to test:
-        if position_data is not None:
-            if position_data.heading is not None:
-                target_heading = position_data.heading - 10
-                target_vector = [0,0.5] # Move forward at 0.5 speed
-                gnc_cmd["heading"] = target_heading
-                gnc_cmd["vector"] = target_vector
+        # If the port camera sees the platform, yaw to the left
+        if port_tower_location is not None:
+            ratio, conf = port_tower_location
+            gnc_cmd["heading"] = position_data.heading - 10
+            return perc_cmd, gnc_cmd
+        
+        # If the starboard camera sees the platform, yaw to the right
+        if starboard_tower_location is not None:
+            ratio, conf = starboard_tower_location
+            gnc_cmd["heading"] = position_data.heading + 10
+            return perc_cmd, gnc_cmd
 
         perc_cmd = {}
+        gnc_cmd = {}
         return perc_cmd, gnc_cmd
+
+    def process_tower_location(self, camera_data: CameraData) -> Tuple[float, float] | None | bool:
+        '''
+        This function processes the tower location from the camera data.
+        It returns the tower location in the form of a tuple (ratio, conf) where ratio is the distance of the tower
+        from the center of the image.
+        and conf is the confidence of the tower detection.
+        If no tower is detected, it returns None.
+        If it starts detecting the colors, it returns True.
+        '''
+        results = camera_data.results
+        if camera_data.results is None:
+            return None
+        if camera_data.frame is None:
+            return None
+        
+        frame_width = camera_data.frame.shape[1]
+
+        conf_list = []
+        for result in results:
+            for box in result.boxes:
+                conf = box.conf.item()
+                cls_id = box.cls.item()
+                x1, y1, x2, y2 = box.xyxy.cpu().numpy().flatten()
+                if conf > 0.3:
+                    # Append the class id, confidence, and bounding box coordinates to conf_list
+                    conf_list.append((int(cls_id), conf, (x1, y1, x2, y2)))
+                        
+        if len(conf_list) != 0:
+            # If a color is detected, return True
+            if any([cls_id in [0, 1, 2, 3] for cls_id, conf, _ in conf_list]):
+                return True
+            # If a tower is detected, return the tower location
+            for conf in conf_list:
+                if conf[0] == 4:
+                    x1, y1, x2, y2 = conf[2]
+                    x = (x1 + x2) / 2
+                    ratio = (x / frame_width) - 0.5
+                    return ratio, conf[1]
+        # No detections
+        return None
+    
+    def destination_point(self, lat, lon, bearing, distance) -> Tuple[float, float]:
+        """
+        Calculate the destination point given a starting point, bearing, and distance in meters
+        """
+        # convert decimal degrees to radians
+        lon, lat, bearing = map(math.radians, [lon, lat, bearing])
+
+        distance = distance/1000
+
+        # calculate the destination point
+        lat2 = math.asin(math.sin(lat) * math.cos(distance/6371) + math.cos(lat) * math.sin(distance/6371) * math.cos(bearing))
+        lon2 = lon + math.atan2(math.sin(bearing) * math.sin(distance/6371) * math.cos(lat), math.cos(distance/6371) - math.sin(lat) * math.sin(lat2))
+        lat2 = math.degrees(lat2)
+        lon2 = math.degrees(lon2)
+        return lat2, lon2
 
     def end(self):
         '''
