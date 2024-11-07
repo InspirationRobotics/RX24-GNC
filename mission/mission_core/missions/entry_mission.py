@@ -41,7 +41,7 @@ class EntryMission(Logger):
     # This dictionary must exist, but some commands are entered as examples
     init_perc_cmd = {
         "start": ["center", "port", "starboard"],
-        "load_model": [("center", "stcB.pt"), ("port", "stcB.pt"), ("starboard", "stcB.pt")],
+        "load_model": [("center", "stcC.pt"), ("port", "stcC.pt"), ("starboard", "stcC.pt")],
         # "stop": ["port", "starboard"],
         # "record": ["center"],
     }

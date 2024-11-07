@@ -21,7 +21,7 @@ class STCMission(Logger):
         "start": ["center", "starboard", "port"],
         # "record": ["center"],
         # "stop_record": ["port", "starboard"],
-        "load_model": [("center", "stcA.pt"), ("starboard", "stcA.pt"), ("port", "stcA.pt")]
+        "load_model": [("center", "stcC.pt"), ("starboard", "stcC.pt"), ("port", "stcC.pt")]
     }
 
     def __init__(self):
