@@ -5,11 +5,11 @@ The variables and functions defined here must exist in all mission classes.
 Comments are provided to explain the purpose of each variable and function and can be removed.
 '''
 import cv2
-import math
 import random
 from typing import Dict, Tuple
 from comms_core import Logger
 from ..mission_node import PositionData
+from ..GIS import haversine, destination_point
 from perception_core import CameraData, Results
 
 '''
@@ -35,7 +35,7 @@ End mission
 '''
 
 
-class EntryMission(Logger):
+class PreSTCMission(Logger):
 
     # Define the initial perception commands here (if any)
     # This dictionary must exist, but some commands are entered as examples
@@ -46,14 +46,19 @@ class EntryMission(Logger):
         # "record": ["center"],
     }
 
-    def __init__(self, debug_mode: bool = False):
+    def __init__(self, start_waypoint : Tuple[float, float] = None, start_heading : float = None, debug_mode: bool = False):
         super().__init__(str(self))
         self.debug_mode = debug_mode
         self.color_count = 0
+
+        self.start_waypoint = start_waypoint
+        self.at_target = False
+        self.start_heading = start_heading
+        self.at_heading = False
+
         if self.debug_mode:
             cv2.namedWindow("view", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("view", 640, 480)
-        self.at_target = False
 
     def __str__(self):
         return self.__class__.__name__
@@ -70,7 +75,7 @@ class EntryMission(Logger):
         For example, Scan the Code would be: 
         heartbeat = ["RXCOD", self.light_pattern]
         '''
-        heartbeat = ["RXGAT", random.choice(["1", "2", "3"]), random.choice(["1", "2", "3"])]
+        heartbeat = ["RXCOD", "NNN"]
         return heartbeat
 
     def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict, Dict]:
@@ -134,6 +139,18 @@ class EntryMission(Logger):
         
         if position_data.heading is None:
             return perc_cmd, gnc_cmd
+
+        if self.start_waypoint is not None and self.start_heading is not None:
+            # Check if we are at the start waypoint and heading
+            if haversine(position_data.lat, position_data.lon, self.start_waypoint[0], self.start_waypoint[1]) > 2 and not self.at_target:
+                gnc_cmd["waypoint"] = self.start_waypoint
+                return perc_cmd, gnc_cmd
+            self.at_target = True
+
+            if abs(position_data.heading - self.start_heading) > 5 and not self.at_heading:
+                gnc_cmd["heading"] = self.start_heading
+                return perc_cmd, gnc_cmd
+            self.at_heading = True
 
         center_camera_data = camera_data.get("center")
         port_camera_data = camera_data.get("port")
@@ -236,39 +253,6 @@ class EntryMission(Logger):
                     return ratio, conf[1]
         # No detections
         return None
-    
-    def destination_point(self, lat, lon, bearing, distance) -> Tuple[float, float]:
-        """
-        Calculate the destination point given a starting point, bearing, and distance in meters
-        """
-        # convert decimal degrees to radians
-        lon, lat, bearing = map(math.radians, [lon, lat, bearing])
-
-        distance = distance/1000
-
-        # calculate the destination point
-        lat2 = math.asin(math.sin(lat) * math.cos(distance/6371) + math.cos(lat) * math.sin(distance/6371) * math.cos(bearing))
-        lon2 = lon + math.atan2(math.sin(bearing) * math.sin(distance/6371) * math.cos(lat), math.cos(distance/6371) - math.sin(lat) * math.sin(lat2))
-        lat2 = math.degrees(lat2)
-        lon2 = math.degrees(lon2)
-        return lat2, lon2
-    
-    def haversine(lat1, lon1, lat2, lon2) -> float:
-        """
-        Calculate the great circle distance between two points
-        on the earth (specified in decimal degrees)
-        Returns distance in meters
-        """
-        # convert decimal degrees to radians
-        lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
-
-        # haversine formula
-        dlon = lon2 - lon1
-        dlat = lat2 - lat1
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        r = 6371000 # Radius of earth in meters. Use 3956 for miles
-        return c * r
 
     def end(self):
         '''

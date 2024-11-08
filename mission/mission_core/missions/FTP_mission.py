@@ -10,6 +10,7 @@ import time
 import cv2
 from comms_core import Logger
 from ..mission_node import PositionData
+from ..GIS import haversine, destination_point
 from perception_core import CameraData, Results
 
 
@@ -23,18 +24,26 @@ class FTPMission(Logger):
         "load_model": [("center", "FTPB.pt")]
     }
 
-    def __init__(self, left_color, debug_mode: bool = False):
+    def __init__(self, left_color, start_waypoint : Tuple[float, float] = None, start_heading : float = None, debug_mode: bool = False):
         super().__init__(str(self))
         if left_color != "R" and left_color != "G":
             raise ValueError("left_color must be either 'R' or 'G'")
         self.left_color = left_color
+
+        self.start_waypoint = start_waypoint
+        self.at_target = False
+        self.start_heading = start_heading
+        self.at_heading = False
+
+        self.end_waypoint = None
+
+        self.active = False
+        self.last_detection = time.time()
+
         self.debug_mode = debug_mode
         if self.debug_mode:
             cv2.namedWindow("view", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("view", 640, 480)
-        self.active = False
-        self.last_detection = time.time()
-        pass
 
     def __str__(self):
         return self.__class__.__name__
@@ -128,12 +137,32 @@ class FTPMission(Logger):
         
         if position_data.heading is None:
             return perc_cmd, gnc_cmd
+        
+        if self.start_waypoint is not None and self.start_heading is not None:
+            # Check if we are at the start waypoint and heading
+            if haversine(position_data.lat, position_data.lon, self.start_waypoint[0], self.start_waypoint[1]) > 2 and not self.at_target:
+                gnc_cmd["waypoint"] = self.start_waypoint
+                return perc_cmd, gnc_cmd
+            self.at_target = True
 
+            if abs(position_data.heading - self.start_heading) > 5 and not self.at_heading:
+                gnc_cmd["heading"] = self.start_heading
+                return perc_cmd, gnc_cmd
+            self.at_heading = True
+
+        # See if we are in end mission state
+        if self.end_waypoint is not None:
+            if haversine(position_data.lat, position_data.lon, self.end_waypoint[0], self.end_waypoint[1]) < 2:
+                gnc_cmd["end_mission"] = True
+                return perc_cmd, gnc_cmd
+
+        # Begin FTP logic
         center_camera_data = camera_data.get("center")
         data = self.process_buoy(center_camera_data)
         if data is None:
-            if time.time() - self.last_detection > 5 and self.active:
-                gnc_cmd["end_mission"] = True
+            if time.time() - self.last_detection > 5 and self.active and self.end_waypoint is None:
+                self.end_waypoint = destination_point(position_data.lat, position_data.lon, position_data.heading, 5) # move 5 meters forward
+                gnc_cmd["waypoint"] = self.end_waypoint
             return perc_cmd, gnc_cmd
         if not self.active:
             self.active = True
@@ -157,21 +186,21 @@ class FTPMission(Logger):
             if ratio < 0.05:
                 yaw_rate = 6
             elif ratio < 0.15:
-                target_speed = 0.4
+                target_speed = 0.3
             else:
                 yaw_rate = -6
         else:
             if ratio > 0.95:
                 yaw_rate = -6
             elif ratio > 0.85:
-                target_speed = 0.4
+                target_speed = 0.3
             else:
                 yaw_rate = 6
-        yaw_rate*=2
+        # yaw_rate*=2
         if yaw_rate > 0:
-            self.warning(f"Yawing left at {yaw_rate}")
-        elif yaw_rate < 0:
             self.warning(f"Yawing right at {yaw_rate}")
+        elif yaw_rate < 0:
+            self.warning(f"Yawing left at {yaw_rate}")
         else:
             self.warning(f"Moving forward at {target_speed}")
         return target_speed, yaw_rate
