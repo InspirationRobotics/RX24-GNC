@@ -8,9 +8,9 @@ from mission_core import MissionHandler, BasicEntry, FTPMission, PreSTCMission, 
 
 if __name__ == "__main__":
 
-    mission0 = BasicEntry()
-    mission1 = FTPMission(start_waypoint=(0,0), start_heading=0)
-    mission2 = PreSTCMission(start_waypoint=(0,0), start_heading=0)
+    mission0 = BasicEntry(distance=42, start_waypoint=(27.375189, -82.452475))
+    mission1 = FTPMission(left_color="R", start_waypoint=(27.37535299868433, -82.45309264065489), start_heading=280)
+    mission2 = PreSTCMission(start_waypoint=(27.37523396312006, -82.45338645963143), start_heading=115 )
     mission3 = STCMission()
     mission4 = DockMission()
     mission_handler = MissionHandler([mission0, mission1, mission2, mission3, mission4])

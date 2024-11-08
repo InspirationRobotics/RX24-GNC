@@ -19,10 +19,11 @@ class BasicEntry(Logger):
     # This dictionary must exist, but some commands are entered as examples
     init_perc_cmd = {}
 
-    def __init__(self, distance=10):
+    def __init__(self, start_waypoint = None, distance=10):
         super().__init__(str(self))
         self.count = 0
         self.distance = distance
+        self.start_waypoint = start_waypoint
         self.target_waypoint = None
         pass
 
@@ -74,14 +75,20 @@ class BasicEntry(Logger):
         if self.count < 2 and position_data is not None:
             if position_data.heading is not None and position_data.position is not None:
                 # This is to ensure we dont keep recalculating a different waypoint as we move
+                if self.start_waypoint is not None:
+                    position_data = PositionData(position=(self.start_waypoint[0], self.start_waypoint[1]), heading=270)
                 self.target_waypoint = destination_point(position_data.lat, position_data.lon, position_data.heading, self.distance)
                 gnc_cmd["waypoint"] = self.target_waypoint
                 self.count += 1
 
         if self.target_waypoint is not None and position_data is not None:
             distance = haversine(position_data.lat, position_data.lon, self.target_waypoint[0], self.target_waypoint[1])
-            if distance < 2:
+            self.warning(f"Distance to waypoint: {distance}")
+            self.warning(f"Target waypoint: {self.target_waypoint}")
+            if distance < 3:
+                self.warning("Ended mission")
                 gnc_cmd["end_mission"] = True
+                return perc_cmd, gnc_cmd
 
         return perc_cmd, gnc_cmd
 

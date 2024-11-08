@@ -1,7 +1,7 @@
 import math
 from typing import Tuple
 
-def destination_point(self, lat, lon, bearing, distance) -> Tuple[float, float]:
+def destination_point(lat, lon, bearing, distance) -> Tuple[float, float]:
     """
     Calculate the destination point given a starting point, bearing, and distance in meters
     """

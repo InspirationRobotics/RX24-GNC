@@ -42,7 +42,7 @@ class DockMission(Logger):
         For example, Scan the Code would be: 
         heartbeat = ["$RXCOD", self.light_pattern]
         '''
-        heartbeat = ["$RXDOK", "R", "1", "1"]
+        heartbeat = ["RXDOK", "R", "1", "1"]
         return heartbeat
 
     def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict, Dict]:

@@ -132,15 +132,18 @@ class MissionHandler(Logger):
     def __callback_loop(self):
         while self.active:
             while self.callback_active:
-                per_cmd, gnc_cmd = self.current_mission.run(self.perception.get_latest_data(), self.position_data)
-                end_mission = self.__parse_gnc_cmd(gnc_cmd)
-                self.perception.command_perception(per_cmd)
-                with self.gs_lock:
-                    self.mission_heartbeat = MissionHeartbeat(self.current_mission.mission_heartbeat())
-                if end_mission:
-                    self.trigger_next = True
-                    break
-                time.sleep(1/20)
+                if self.position_data is not None:
+                    if self.position_data.heading is not None and self.position_data.position is not None:
+                        if isinstance(self.position_data.heading, float) and isinstance(self.position_data.lat, float) and isinstance(self.position_data.lon, float):
+                            per_cmd, gnc_cmd = self.current_mission.run(self.perception.get_latest_data(), self.position_data)
+                            end_mission = self.__parse_gnc_cmd(gnc_cmd)
+                            self.perception.command_perception(per_cmd)
+                            with self.gs_lock:
+                                self.mission_heartbeat = MissionHeartbeat(self.current_mission.mission_heartbeat())
+                            if end_mission:
+                                self.trigger_next = True
+                                break
+                            time.sleep(1/20)
             time.sleep(0.5)
 
     def __send_loop(self):

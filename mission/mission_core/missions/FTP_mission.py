@@ -140,18 +140,21 @@ class FTPMission(Logger):
         
         if self.start_waypoint is not None and self.start_heading is not None:
             # Check if we are at the start waypoint and heading
-            if haversine(position_data.lat, position_data.lon, self.start_waypoint[0], self.start_waypoint[1]) > 2 and not self.at_target:
+            if haversine(position_data.lat, position_data.lon, self.start_waypoint[0], self.start_waypoint[1]) > 3 and not self.at_target:
                 gnc_cmd["waypoint"] = self.start_waypoint
+                self.warning(f"Moving towards waypoint: {self.start_waypoint}")
                 return perc_cmd, gnc_cmd
             self.at_target = True
 
             if abs(position_data.heading - self.start_heading) > 5 and not self.at_heading:
                 gnc_cmd["heading"] = self.start_heading
+                self.warning(f"Turning towards heading: {self.start_heading}")
                 return perc_cmd, gnc_cmd
             self.at_heading = True
 
         # See if we are in end mission state
         if self.end_waypoint is not None:
+            self.warning(f"Heading towards waypoint: {self.end_waypoint}")
             if haversine(position_data.lat, position_data.lon, self.end_waypoint[0], self.end_waypoint[1]) < 2:
                 gnc_cmd["end_mission"] = True
                 return perc_cmd, gnc_cmd
@@ -161,7 +164,7 @@ class FTPMission(Logger):
         data = self.process_buoy(center_camera_data)
         if data is None:
             if time.time() - self.last_detection > 5 and self.active and self.end_waypoint is None:
-                self.end_waypoint = destination_point(position_data.lat, position_data.lon, position_data.heading, 5) # move 5 meters forward
+                self.end_waypoint = destination_point(position_data.lat, position_data.lon, position_data.heading, 8) # move 5 meters forward
                 gnc_cmd["waypoint"] = self.end_waypoint
             return perc_cmd, gnc_cmd
         if not self.active:
@@ -184,18 +187,18 @@ class FTPMission(Logger):
         # If the buoy should be on the left side of the screen.
         if location == "L":
             if ratio < 0.05:
-                yaw_rate = 6
+                yaw_rate = -6
             elif ratio < 0.15:
                 target_speed = 0.3
             else:
-                yaw_rate = -6
+                yaw_rate = 6
         else:
             if ratio > 0.95:
-                yaw_rate = -6
+                yaw_rate = 6
             elif ratio > 0.85:
                 target_speed = 0.3
             else:
-                yaw_rate = 6
+                yaw_rate = -6
         # yaw_rate*=2
         if yaw_rate > 0:
             self.warning(f"Yawing right at {yaw_rate}")
@@ -257,11 +260,12 @@ class FTPMission(Logger):
             return None
         
         lookup = {0: "Red", 1: "Green", 2: "Black"}
-        self.warning(f"Buoy detected: {lookup[target_buoy[0]]} with confidence: {target_buoy[1]}")
 
         # Determine where it is on screen
         center_x = (target_buoy[2][0] + target_buoy[2][2]) / 2
         ratio = center_x / frame_width
+
+        self.warning(f"Buoy detected: {lookup[target_buoy[0]]} with ratio: {ratio}")
 
         # Determine where the target buoy should be:
         if target_buoy[0] == 2:

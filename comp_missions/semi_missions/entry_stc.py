@@ -8,7 +8,7 @@ from mission_core import MissionHandler, STCMission, PreSTCMission, BasicEntry, 
 
 if __name__ == "__main__":
 
-    mission0 = BasicEntry()
+    mission0 = BasicEntry(distance=43, start_waypoint=(27.373318, -82.452442))
     mission1 = PreSTCMission(debug_mode=False)
     mission2 = STCMission()
     mission3 = DockMission()
