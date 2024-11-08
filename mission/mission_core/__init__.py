@@ -8,5 +8,6 @@ from .missions.nav_mission import NavMission
 from .missions.pre_STC_mission import PreSTCMission
 from .missions.FTP_mission import FTPMission
 from .missions.basic_entry import BasicEntry
+from .missions.dock_mission import DockMission
 
 from .GIS import haversine, destination_point
