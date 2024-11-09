@@ -132,8 +132,6 @@ class PreSTCMission(Logger):
         perc_cmd = {}
         gnc_cmd = {}
 
-        gnc_cmd["vector"] = [0, 0.3]
-
         if position_data is None:
             return perc_cmd, gnc_cmd
         
@@ -151,6 +149,8 @@ class PreSTCMission(Logger):
                 gnc_cmd["heading"] = self.start_heading
                 return perc_cmd, gnc_cmd
             self.at_heading = True
+
+        gnc_cmd["vector"] = [0, 0.3]
 
         center_camera_data = camera_data.get("center")
         port_camera_data = camera_data.get("port")
@@ -173,7 +173,7 @@ class PreSTCMission(Logger):
         # 5 frames of color detection is enough to assume we are at the platform
         if self.color_count >= 5:
             gnc_cmd = {
-                "poshold": True,
+                # "poshold": True,
                 "end_mission": True
             }
             return perc_cmd, gnc_cmd
@@ -183,7 +183,7 @@ class PreSTCMission(Logger):
         if center_tower_location is not None:
             ratio, conf = center_tower_location
             if abs(ratio) < 0.1:
-                gnc_cmd["vector"] = [0,0.5]
+                gnc_cmd["vector"] = [0,0.3]
                 gnc_cmd["heading"] = position_data.heading
             elif ratio < 0:
                 gnc_cmd["heading"] = position_data.heading - 6

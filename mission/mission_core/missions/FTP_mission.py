@@ -40,6 +40,8 @@ class FTPMission(Logger):
         self.active = False
         self.last_detection = time.time()
 
+        self.last_end = time.time()
+
         self.debug_mode = debug_mode
         if self.debug_mode:
             cv2.namedWindow("view", cv2.WINDOW_NORMAL)
@@ -130,8 +132,6 @@ class FTPMission(Logger):
         perc_cmd = {}
         gnc_cmd = {}
 
-        gnc_cmd["vector"] = [0, 0]
-
         if position_data is None:
             return perc_cmd, gnc_cmd
         
@@ -154,10 +154,18 @@ class FTPMission(Logger):
 
         # See if we are in end mission state
         if self.end_waypoint is not None:
-            self.warning(f"Heading towards waypoint: {self.end_waypoint}")
-            if haversine(position_data.lat, position_data.lon, self.end_waypoint[0], self.end_waypoint[1]) < 2:
+            if time.time() - self.last_end > 10:
+                self.warning("Force Ending mission")
                 gnc_cmd["end_mission"] = True
                 return perc_cmd, gnc_cmd
+            self.warning(f"Heading towards waypoint: {self.end_waypoint}")
+            if haversine(position_data.lat, position_data.lon, self.end_waypoint[0], self.end_waypoint[1]) < 3:
+                gnc_cmd["end_mission"] = True
+            else:
+                gnc_cmd["waypoint"] = self.end_waypoint
+            return perc_cmd, gnc_cmd
+
+        gnc_cmd["vector"] = [0, 0]
 
         # Begin FTP logic
         center_camera_data = camera_data.get("center")
@@ -166,6 +174,7 @@ class FTPMission(Logger):
             if time.time() - self.last_detection > 5 and self.active and self.end_waypoint is None:
                 self.end_waypoint = destination_point(position_data.lat, position_data.lon, position_data.heading, 8) # move 5 meters forward
                 gnc_cmd["waypoint"] = self.end_waypoint
+                self.last_end = time.time()
             return perc_cmd, gnc_cmd
         if not self.active:
             self.active = True

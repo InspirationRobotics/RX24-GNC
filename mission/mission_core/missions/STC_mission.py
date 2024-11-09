@@ -12,6 +12,7 @@ from perception_core import CameraData, Results
 from itertools import groupby
 import cv2
 import numpy as np
+import time
 
 class STCMission(Logger):
 
@@ -30,11 +31,12 @@ class STCMission(Logger):
         self.lookup = {0:'N',1:'B',2:'G',3:'R'}
         self.storageArray = []
         self.stringAnalyzed = []
-        self.max_value = 0
         self.light_pattern = "NNN"
         self.countThreshold = 2
-        self.confidence_threshold = 0.5
         self.debug_mode = debug_mode
+
+        self.last_detection = None
+        self.active = None
         
     def __str__(self):
         return self.__class__.__name__
@@ -99,6 +101,22 @@ class STCMission(Logger):
         gnc_cmd = {}
         # gnc_cmd = {"poshold": True}
 
+
+        if self.active is None:
+            self.active = time.time()
+            self.log("Mission started")
+
+        # Timeout after 10 seconds of no detections
+        timeout = 10
+        if self.last_detection is None:
+            if time.time() - self.active > timeout:
+                gnc_cmd = {"end_mission": True}
+                return perc_cmd, gnc_cmd
+        else:
+            if time.time() - self.last_detection > timeout:
+                gnc_cmd = {"end_mission": True}
+                return perc_cmd, gnc_cmd
+
         # Run one yolo inference on the provided frame at camera_data.frame
         center_camera_data = camera_data.get("center")
         center_camera_results = center_camera_data.results
@@ -127,6 +145,7 @@ class STCMission(Logger):
                 gnc_cmd = {"end_mission": True}
                 return perc_cmd, gnc_cmd
             if i in ["0","1","2","3"]:
+                self.last_detection = time.time()
                 self.storageArray.append(i)
             
         if(len(self.storageArray) != 0):

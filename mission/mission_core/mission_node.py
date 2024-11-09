@@ -22,6 +22,16 @@ class PositionData:
         self.lon = position[1] if position is not None else None
         self.heading = heading
 
+    def is_valid(self):
+        valid = True
+        if not isinstance(self.lat, float):
+            valid = False
+        if not isinstance(self.lon, float):
+            valid = False
+        if not isinstance(self.heading, float):
+            valid = False
+        return valid
+        
 
 class OccupancyData:
     def __init__(self, msg: Occupancy):

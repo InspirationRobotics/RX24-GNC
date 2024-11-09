@@ -12,8 +12,9 @@ from ..mission_node import PositionData
 from ..GIS import haversine, destination_point
 from perception_core import CameraData, Results
 
+import random
 
-class SimpleMission(Logger):
+class BasicExit(Logger):
 
     # Define the initial perception commands here (if any)
     # This dictionary must exist, but some commands are entered as examples
@@ -23,8 +24,10 @@ class SimpleMission(Logger):
         # "record": ["center"],
     }
 
-    def __init__(self):
+    def __init__(self, waypoints : list):
         super().__init__(str(self))
+        self.waypoints = waypoints
+        self.active = False
         pass
 
     def __str__(self):
@@ -42,7 +45,7 @@ class SimpleMission(Logger):
         For example, Scan the Code would be: 
         heartbeat = ["$RXCOD", self.light_pattern]
         '''
-        heartbeat = []
+        heartbeat = ["RXGAT", random.choice(["1", "2", "3"]), random.choice(["1", "2", "3"])]
         return heartbeat
 
     def run(self, camera_data: Dict[str, CameraData], position_data: PositionData, occupancy_grid = None) -> Tuple[Dict, Dict, Dict]:
@@ -93,6 +96,20 @@ class SimpleMission(Logger):
         '''
         perc_cmd = {}
         gnc_cmd = {}
+
+        if not self.active:
+            self.active = True
+            gnc_cmd["waypoint"] = self.waypoints
+
+        if self.waypoints is not None and position_data is not None:
+            if position_data.is_valid():
+                distance = haversine(position_data.lat, position_data.lon, self.waypoints[-1][0], self.waypoints[-1][1])
+                self.warning(f"Distance to waypoint: {distance}")
+                if distance < 3:
+                    self.warning("Ended mission")
+                    gnc_cmd["end_mission"] = True
+                    return perc_cmd, gnc_cmd
+
         return perc_cmd, gnc_cmd
 
     def end(self):
